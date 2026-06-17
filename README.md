@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://gesh75.github.io/argus/"><img src="docs/assets/preview.png" alt="Argus — live documentation" width="100%"></a>
 </p>
-<p align="center"><b><a href="https://gesh75.github.io/argus/">▶ Open the live architecture site</a></b> · <a href="docs/argus_demo.mp4">▶ Watch the demo</a></p>
+<p align="center"><b><a href="docs/argus_real_demo.mp4">▶ Watch the real-product demo</a></b> (narrated · real scan against a live lab) · <a href="https://gesh75.github.io/argus/">open the architecture site</a> · <a href="docs/argus_demo.mp4">architecture walkthrough</a></p>
 
 # Argus
 
