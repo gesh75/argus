@@ -1,11 +1,11 @@
-# ECP Aegis — Security Posture (STRICT)
+# Argus — Security Posture (STRICT)
 
 Aegis is an offensive-capable tool operated against a **healthcare (HIPAA/PHI)** network.
 It is built to be strict by default. This document is the contract.
 
 ## 1. Authorization (hard gate)
-- **No live (non-lab) scan without:** written authorization from ECP leadership, a defined
-  CIDR scope, and an explicit exclusion list (clinical/EHR/PACS/PHI-bearing systems).
+- **No live (non-lab) scan without:** written authorization from leadership, a defined
+  CIDR scope, and an explicit exclusion list (sensitive/regulated systems/PHI-bearing systems).
 - The scope guard is **default-deny**: any target that is unparseable, obfuscated
   (decimal/hex/octal), a hostname (no DNS), a CIDR broader than /24, or outside the
   allow-list is refused **before** anything executes.

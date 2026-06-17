@@ -80,7 +80,7 @@ class HttpTransport:
 
     def get(self, url: str, timeout: int) -> HttpResult:
         req = urllib.request.Request(url, method="GET",
-                                     headers={"User-Agent": "ECP-Aegis-Recon/1.0"})
+                                     headers={"User-Agent": "Argus-Recon/1.0"})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
                 body = resp.read(self.max_body).decode("utf-8", "replace")
@@ -107,7 +107,7 @@ class SandboxTransport:
 
     def get(self, url: str, timeout: int) -> HttpResult:
         argv = ["curl", "-s", "-i", "-m", str(timeout), "-A",
-                "ECP-Aegis-Recon/1.0", url]
+                "Argus-Recon/1.0", url]
         ex = self.sandbox.run(argv, timeout=timeout + 3)
         return self._parse(ex.stdout)
 

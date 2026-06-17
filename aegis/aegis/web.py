@@ -25,7 +25,7 @@ COMPOSE = ROOT.parent / "targets" / "docker-compose.yml"
 OUT = ROOT / "output"
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 
-app = FastAPI(title="ECP Aegis", version="0.1.0")
+app = FastAPI(title="Argus", version="0.1.0")
 
 # Serialize scans: the HMAC audit chain must stay linear. Sync handlers run in a
 # threadpool, so concurrent scans would fork the chain — one operator, one scan at a time.

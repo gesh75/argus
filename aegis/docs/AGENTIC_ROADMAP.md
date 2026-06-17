@@ -1,4 +1,4 @@
-# ECP Aegis — Agentic Evolution Roadmap
+# Argus — Agentic Evolution Roadmap
 
 Turns Aegis from an automated scanner framework into an **agentic AI pentester** that
 reasons, chains, and adapts — without breaking the read-only / fail-closed contract that

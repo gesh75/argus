@@ -1,4 +1,4 @@
-# ECP Aegis — Build & Test Log
+# Argus — Build & Test Log
 
 Complete record of what was built and how it was validated. Companion to `README.md`
 (usage), `SECURITY.md` (posture), and the animated `/architecture` page (overview).
@@ -9,8 +9,7 @@ Complete record of what was built and how it was validated. Companion to `README
 ---
 
 ## 1. What Aegis does (in one paragraph)
-An authorized, **sandbox-first**, AI-driven penetration-testing platform for ECP (healthcare /
-HIPAA). It discovers security gaps across the **network**, **Linux/Windows hosts**, and
+An authorized, **sandbox-first**, AI-driven penetration-testing platform for an internal enterprise. It discovers security gaps across the **network**, **Linux/Windows hosts**, and
 **Active Directory**, strictly **read-only**, behind a **7-layer fail-closed guardrail**, with
 **tamper-evident HMAC audit**, and turns findings into **platform-specific step-by-step
 mitigations** via a **switchable AI engine** (cloud Claude · local Gemma/Ollama · offline heuristic).
@@ -28,7 +27,7 @@ mitigations** via a **switchable AI engine** (cloud Claude · local Gemma/Ollama
 | `ai_analyzer.py` | Cost-aware 2-pass AI (triage→correlate); 3 providers; Ollama JSON-schema enforcement; offline heuristic (CVE/SMB/SNMP/TLS/privesc/config/AD rules) |
 | `mitigations.py` | Platform playbooks: Meraki/Juniper/Arista/Cisco · Windows-SMB/AD/privesc · Linux-privesc/SSH/Samba · Apache/PHP/TLS — HIPAA-framed |
 | `orchestrator.py` | Network scan orchestration (profile → plan → guardrail → sandbox → parse → AI), tool-unavailable surfacer |
-| `reporting.py` | CSV/MD/JSON into ECP ticket format + step-by-step playbook section + `collapse_errors()` |
+| `reporting.py` | CSV/MD/JSON into ticket format + step-by-step playbook section + `collapse_errors()` |
 | `cli.py` / `__main__.py` | `aegis scan · host · ad · audit · verify` |
 | `web.py` | FastAPI console: `/`, `/architecture`, `/api/{policy,models,scan,host,ad}` |
 | `static/index.html` | Polished GUI with scan-type tabs (network/host-linux/host-windows/AD) |
@@ -207,5 +206,5 @@ closed catalog — never payloads or writes. Never runnable against live/clinica
 - PingCastle / BloodHound integration for full AD attack-path scoring.
 - Production audit hardening (separate HMAC signer, OS-append-only/WORM log, two-node worker isolation).
 
-> ⚠️ Before any live (non-lab) use: written authorization + CIDR scope + clinical/EHR/PACS
+> ⚠️ Before any live (non-lab) use: written authorization + CIDR scope + sensitive/regulated systems
 > exclusions; rotate the Anthropic key; change the demo HMAC key. See `SECURITY.md`.

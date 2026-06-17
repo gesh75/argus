@@ -3,7 +3,7 @@
 Maps a finding (title + evidence + asset) to the detected platform and a concrete,
 ordered remediation procedure. Used to (a) enrich any finding that lacks steps —
 including offline/heuristic mode — and (b) ground the LLM's own suggestions.
-Tuned for ECP's stack: Meraki / Juniper / Arista / Cisco network gear, Windows AD/SMB,
+Tuned for a common enterprise stack: Meraki / Juniper / Arista / Cisco network gear, Windows AD/SMB,
 and common web stacks (Apache/Nginx/IIS/PHP), with HIPAA framing.
 """
 from __future__ import annotations

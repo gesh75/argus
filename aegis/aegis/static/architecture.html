@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ECP Aegis — Architecture</title>
+<title>Argus — Architecture</title>
 <style>
   :root{--bg:#0a0e14;--panel:#11161f;--line:#222b38;--fg:#e6edf3;--mut:#8b949e;
         --blue:#58a6ff;--green:#3fb950;--red:#f85149;--amber:#e3b341;--purple:#bc8cff}
@@ -66,11 +66,11 @@
 </head>
 <body>
 <header class="hero wrap">
-  <div class="badge">Authorized internal security platform · ECP</div>
-  <h1>ECP Aegis</h1>
+  <div class="badge">Authorized internal security platform</div>
+  <h1>Argus</h1>
   <p class="sub">An AI-driven, sandbox-first penetration testing platform that discovers
     security gaps across the network, Linux/Windows hosts, and Active Directory — strictly
-    read-only, fully audited, and safe for a healthcare environment.</p>
+    read-only, fully audited, and safe for sensitive internal environments.</p>
   <div class="pills">
     <span class="pill">🛡️ 7-layer guardrail</span>
     <span class="pill">🧠 Claude · local Gemma · offline</span>
@@ -94,7 +94,7 @@
     <div class="flowdot" style="animation-delay:1.2s"></div>
     <div class="layer l5"><span class="lnum">Layer 5</span><span class="ltitle">🧠 AI Analysis</span><span class="ldesc">Cost-aware triage → correlation. CVSS · MITRE ATT&CK · attack paths.</span></div>
     <div class="flowdot" style="animation-delay:1.6s"></div>
-    <div class="layer l6"><span class="lnum">Layer 6</span><span class="ltitle">📊 Reporting</span><span class="ldesc">Platform mitigation playbooks → CSV/MD/JSON into the ECP ticket tracker.</span></div>
+    <div class="layer l6"><span class="lnum">Layer 6</span><span class="ltitle">📊 Reporting</span><span class="ldesc">Platform mitigation playbooks → CSV/MD/JSON into the the ticket tracker.</span></div>
   </div>
 </section>
 
@@ -150,9 +150,9 @@
 
 <section class="wrap reveal">
   <h2><b>Security posture</b> — strict by default</h2>
-  <p class="lead">Built for a healthcare network: read-only, isolated, least-privilege, auditable.</p>
+  <p class="lead">Built for a internal enterprise network: read-only, isolated, least-privilege, auditable.</p>
   <div class="sec"><span class="chk">✓</span><span><b>Read-only everywhere.</b> No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>Sandbox-first.</b> Targets run on an internet-and-LAN-isolated network; live work requires written authorization + CIDR scope + clinical/EHR/PACS exclusions.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>Sandbox-first.</b> Targets run on an internet-and-LAN-isolated network; live work requires written authorization + CIDR scope + sensitive/regulated systems exclusions.</span></div>
   <div class="sec"><span class="chk">✓</span><span><b>Least privilege &amp; strict transport.</b> Dedicated read-only audit accounts; WinRM defaults to HTTPS with cert validation; SSH key-auth preferred.</span></div>
   <div class="sec"><span class="chk">✓</span><span><b>Credentials never logged.</b> The audit records only the check + target; secrets and PHI are redacted from all output.</span></div>
   <div class="sec"><span class="chk">✓</span><span><b>Tamper-evident.</b> HMAC-chained audit trail; <code>aegis audit</code> verifies the chain end-to-end.</span></div>
@@ -160,7 +160,7 @@
 </section>
 
 <footer class="wrap">
-  ECP Aegis · authorized internal security testing only · generated architecture overview
+  Argus · authorized internal security testing only · generated architecture overview
 </footer>
 
 <script>

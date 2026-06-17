@@ -16,7 +16,7 @@ WINDOWS_VULN_FIXTURE: dict[str, str] = {
                 "Version      : 10.0.17763\nBuildNumber  : 17763\nOSArchitecture : 64-bit"),
     "hotfixes": "12\n\nHotFixID   InstalledOn\n--------   -----------\nKB5005112  1/12/2023",
     "local_admins": ("Name                   PrincipalSource\n----                   ---------------\n"
-                     "ECP\\Domain Admins       ActiveDirectory\n"
+                     "CORP\\Domain Admins       ActiveDirectory\n"
                      "WIN-SRV01\\Administrator  Local\nWIN-SRV01\\svc_backup     Local"),
     "smb_signing": ("EnableSMB1Protocol       : True\n"
                     "RequireSecuritySignature : False\nEnableSecuritySignature  : False"),

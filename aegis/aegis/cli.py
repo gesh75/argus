@@ -176,7 +176,7 @@ def cmd_verify(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="aegis", description="ECP Aegis pentest orchestrator")
+    p = argparse.ArgumentParser(prog="aegis", description="Argus pentest orchestrator")
     p.add_argument("--policy", default=str(DEFAULT_POLICY))
     sub = p.add_subparsers(dest="cmd", required=True)
 

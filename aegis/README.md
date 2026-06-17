@@ -1,11 +1,11 @@
-# ECP Aegis — AI-Driven Internal Pentest Orchestrator
+# Argus — AI-Driven Internal Pentest Orchestrator
 
-Authorized, **sandbox-first** AI pentest tool for ECP (healthcare / HIPAA). Read-only recon by
+Authorized, **sandbox-first** AI pentest tool for an internal enterprise (security / HIPAA). Read-only recon by
 default, a hardened 7-layer guardrail, cost-aware two-pass AI analysis, and reports that drop
-straight into ECP's remediation tracker. CLI **and** web GUI.
+straight into your remediation tracker. CLI **and** web GUI.
 
 > ⚠️ Authorized internal security testing only. Run against the isolated lab (`../targets`) first.
-> Live use requires written authorization, a defined CIDR scope, and the clinical/EHR/PACS exclusion list.
+> Live use requires written authorization, a defined CIDR scope, and the sensitive/regulated systems exclusion list.
 
 ## Install
 ```bash
@@ -46,7 +46,7 @@ cli.py / web.py ──> orchestrator.py ──> guardrail.py (7 layers, fail-clo
                                   ├──> sandbox.py (docker exec, argv-only, OS timeout)
                                   ├──> tools.py   (read-only recon + parsers, defusedxml)
                                   └──> ai_analyzer.py (Haiku triage → Sonnet correlate, offline fallback)
-                                                 └──> reporting.py (CSV/MD/JSON → ECP tickets)
+                                                 └──> reporting.py (CSV/MD/JSON → tickets)
 ```
 
 ## Guardrail (Phantom 7-layer, hardened by adversarial review)
