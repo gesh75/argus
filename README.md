@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://gesh75.github.io/argus/"><img src="docs/assets/preview.png" alt="Argus — live documentation" width="100%"></a>
 </p>
-<p align="center"><b><a href="docs/argus_feature_tour.mp4">▶ Watch the 90-second feature tour</a></b> (narrated · guardrail refusal · switchable brain · real Claude + offline scans · HMAC audit) · <a href="docs/argus_real_demo.mp4">short real-scan demo</a> · <a href="https://gesh75.github.io/argus/">architecture site</a></p>
+<p align="center"><b><a href="docs/argus_feature_tour.mp4">▶ Watch the feature tour</a></b> (narrated · guardrail refusal · real Network · Linux · Windows · AD scans · CVSS/MITRE · HMAC audit) · <a href="docs/argus_real_demo.mp4">short real-scan demo</a> · <a href="https://gesh75.github.io/argus/">architecture site</a></p>
 
 # Argus
 
