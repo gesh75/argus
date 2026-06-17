@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Argus — Architecture</title>
+<style>
+  :root{--bg:#0a0e14;--panel:#11161f;--line:#222b38;--fg:#e6edf3;--mut:#8b949e;
+        --blue:#58a6ff;--green:#3fb950;--red:#f85149;--amber:#e3b341;--purple:#bc8cff}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:15px/1.65 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);
+    background:radial-gradient(1100px 600px at 75% -5%,rgba(88,166,255,.10),transparent 60%),
+               radial-gradient(900px 500px at 0% 100%,rgba(63,185,80,.08),transparent 55%),var(--bg);
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  header.hero{padding:90px 0 50px;text-align:center}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:5px 16px;margin-bottom:22px}
+  h1{font-size:54px;margin:0 0 14px;line-height:1.05;font-weight:800;
+    background:linear-gradient(100deg,#58a6ff,#3fb950 60%,#bc8cff);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    background-size:200% auto;animation:shine 6s linear infinite}
+  @keyframes shine{to{background-position:200% center}}
+  .sub{color:var(--mut);font-size:19px;max-width:660px;margin:0 auto}
+  .pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .pill{font-size:12px;border:1px solid var(--line);border-radius:14px;padding:5px 12px;color:var(--fg);
+    background:var(--panel)}
+  section{padding:46px 0;border-top:1px solid var(--line)}
+  h2{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:0 0 4px}
+  h2 b{color:var(--fg)} .lead{font-size:22px;font-weight:700;margin:0 0 26px}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  /* pipeline */
+  .pipe{display:flex;flex-direction:column;gap:14px}
+  .layer{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;display:flex;align-items:center;gap:18px;overflow:hidden}
+  .layer::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .layer.l1::before{background:var(--blue)} .layer.l2::before{background:var(--red)}
+  .layer.l3::before{background:var(--amber)} .layer.l4::before{background:var(--green)}
+  .layer.l5::before{background:var(--purple)} .layer.l6::before{background:var(--blue)}
+  .lnum{font-size:12px;color:var(--mut);min-width:62px}
+  .ltitle{font-weight:700;min-width:230px}
+  .ldesc{color:var(--mut);font-size:13.5px}
+  .flowdot{width:9px;height:9px;border-radius:50%;background:var(--green);margin:8px auto;
+    box-shadow:0 0 10px var(--green);animation:fall 2.4s linear infinite;opacity:.0}
+  @keyframes fall{0%{opacity:0;transform:translateY(-6px)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(6px)}}
+  /* guardrail grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+    transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.4);border-color:#324053}
+  .card .n{font-size:11px;color:var(--mut)} .card h3{margin:6px 0 6px;font-size:15px}
+  .card p{margin:0;color:var(--mut);font-size:13px}
+  .kpis{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 26px;text-align:center;min-width:140px}
+  .kpi b{display:block;font-size:34px;font-weight:800}
+  .kpi.b b{color:var(--blue)} .kpi.g b{color:var(--green)} .kpi.p b{color:var(--purple)} .kpi.a b{color:var(--amber)}
+  .kpi span{font-size:12px;color:var(--mut)}
+  .sec{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:14px 18px;
+    margin:10px 0;background:var(--panel);display:flex;gap:12px;align-items:flex-start}
+  .sec .chk{color:var(--green);font-weight:800} .sec b{color:var(--fg)} .sec span{color:var(--mut);font-size:13.5px}
+  footer{padding:50px 0 80px;text-align:center;color:var(--mut);font-size:13px}
+  code{background:#0a0e14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px}
+  @media (max-width:760px){h1{font-size:38px} .ltitle{min-width:0} .layer{flex-wrap:wrap;gap:8px}}
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <div class="badge">Authorized internal security platform</div>
+  <h1>Argus</h1>
+  <p class="sub">An AI-driven, sandbox-first penetration testing platform that discovers
+    security gaps across the network, Linux/Windows hosts, and Active Directory — strictly
+    read-only, fully audited, and safe for sensitive internal environments.</p>
+  <div class="pills">
+    <span class="pill">🛡️ 7-layer guardrail</span>
+    <span class="pill">🧠 Claude · local Gemma · offline</span>
+    <span class="pill">🔬 network · host · AD</span>
+    <span class="pill">🏥 HIPAA-aware</span>
+    <span class="pill">📝 HMAC-audited</span>
+  </div>
+</header>
+
+<section class="wrap reveal">
+  <h2><b>The pipeline</b> — how a scan flows</h2>
+  <p class="lead">Every action descends through the same layered path. Nothing reaches a target without passing the guardrail.</p>
+  <div class="pipe">
+    <div class="layer l1"><span class="lnum">Layer 1</span><span class="ltitle">🎛️ Operator Console</span><span class="ldesc">CLI + FastAPI GUI. Pick targets, profile, and AI brain.</span></div>
+    <div class="flowdot" style="animation-delay:.0s"></div>
+    <div class="layer l2"><span class="lnum">Layer 2</span><span class="ltitle">🛡️ Guardrail (fail-closed)</span><span class="ldesc">Scope canonicalization · tool/command catalog · budget · HMAC audit.</span></div>
+    <div class="flowdot" style="animation-delay:.4s"></div>
+    <div class="layer l3"><span class="lnum">Layer 3</span><span class="ltitle">📦 Sandbox</span><span class="ldesc">Isolated <code>--internal</code> Docker net · argv-only exec · OS timeouts.</span></div>
+    <div class="flowdot" style="animation-delay:.8s"></div>
+    <div class="layer l4"><span class="lnum">Layer 4</span><span class="ltitle">🔬 Collectors</span><span class="ldesc">16 network tools · Linux/SSH · Windows/WinRM · AD/LDAP — all read-only.</span></div>
+    <div class="flowdot" style="animation-delay:1.2s"></div>
+    <div class="layer l5"><span class="lnum">Layer 5</span><span class="ltitle">🧠 AI Analysis</span><span class="ldesc">Cost-aware triage → correlation. CVSS · MITRE ATT&CK · attack paths.</span></div>
+    <div class="flowdot" style="animation-delay:1.6s"></div>
+    <div class="layer l6"><span class="lnum">Layer 6</span><span class="ltitle">📊 Reporting</span><span class="ldesc">Platform mitigation playbooks → CSV/MD/JSON into the the ticket tracker.</span></div>
+  </div>
+</section>
+
+<section class="wrap reveal">
+  <h2><b>The guardrail</b> — 7 layers, fail-closed</h2>
+  <p class="lead">Borrowed from Phantom's defense model, hardened by adversarial review.</p>
+  <div class="grid">
+    <div class="card"><div class="n">Layer 1</div><h3>Scope guard</h3><p>Targets canonicalized (decimal/hex/octal) then <code>subnet_of</code> the allowed range. Default-deny on anything unparseable.</p></div>
+    <div class="card"><div class="n">Layer 2</div><h3>Tool / command firewall</h3><p>Closed allowlists. Per-tool dangerous-flag denial. Exploit tools armed-only.</p></div>
+    <div class="card"><div class="n">Layer 3</div><h3>Sandbox isolation</h3><p>Argv-only exec in an internet-isolated Docker network. No shell, no host route.</p></div>
+    <div class="card"><div class="n">Layer 4–5</div><h3>Budget &amp; time</h3><p>Wall-clock + token + dollar ceilings on a monotonic ledger. Kill on breach.</p></div>
+    <div class="card"><div class="n">Layer 6</div><h3>HMAC audit</h3><p>SHA-256 chained, tamper-evident log of every authorize/exec/deny.</p></div>
+    <div class="card"><div class="n">Layer 7</div><h3>Output sanitizer</h3><p>Redacts secrets/PHI (passwords, SSN, MRN); tool output treated as untrusted.</p></div>
+  </div>
+</section>
+
+<section class="wrap reveal">
+  <h2><b>Coverage</b> — what Aegis sees</h2>
+  <p class="lead">Network outside-in, plus credentialed host and directory depth.</p>
+  <div class="grid">
+    <div class="card"><div class="n">Network</div><h3>16 read-only tools</h3><p>nmap · masscan · nuclei · sslscan · whatweb · enum4linux · smbmap · snmp · ldapsearch — 9 profiles.</p></div>
+    <div class="card"><div class="n">Host · Linux</div><h3>SSH audit</h3><p>SUID/GTFOBins · NOPASSWD sudo · weak sshd · world-writable · Lynis.</p></div>
+    <div class="card"><div class="n">Host · Windows</div><h3>WinRM audit</h3><p>SMB signing · AlwaysInstallElevated · unquoted services · WDigest · UAC · LAPS.</p></div>
+    <div class="card"><div class="n">Active Directory</div><h3>LDAP / AD</h3><p>Anonymous bind · RootDSE disclosure · user enumeration. PingCastle/BloodHound hooks.</p></div>
+  </div>
+</section>
+
+<section class="wrap reveal">
+  <h2><b>The brain</b> — switchable, cost-aware</h2>
+  <p class="lead">One scan, three interchangeable engines — pick per run.</p>
+  <div class="kpis">
+    <div class="kpi b"><b>Claude</b><span>Haiku → Sonnet<br>cloud, deepest reasoning</span></div>
+    <div class="kpi g"><b>Ollama</b><span>Gemma / Qwen<br>local · PHI-safe · $0</span></div>
+    <div class="kpi p"><b>Offline</b><span>heuristic rules<br>no network, always works</span></div>
+  </div>
+</section>
+
+<section class="wrap reveal">
+  <h2><b>Agentic reasoning</b> — propose, then the guardrail disposes</h2>
+  <p class="lead">Beyond a linear checklist: Aegis reasons over the evidence graph, chains
+    findings into attack paths, and adapts what it runs next — every action still
+    re-authorized by the 7-layer guardrail, so autonomy never escapes scope.</p>
+  <div class="grid">
+    <div class="card"><div class="n">Module 1</div><h3>Web / API recon</h3><p>Curated read-only probe for <code>.env</code>, <code>.git</code>, actuator, Swagger/OpenAPI — maps the unauthenticated foothold surface.</p></div>
+    <div class="card"><div class="n">Module 5</div><h3>Segmentation validator</h3><p>Reframes recon as architecture: flags database/management/directory planes reachable from a user VLAN.</p></div>
+    <div class="card"><div class="n">Module 4</div><h3>Shadow-AI discovery</h3><p>Finds ungoverned local LLMs/notebooks (Ollama, Jupyter, Gradio, vLLM, vector DBs).</p></div>
+    <div class="card"><div class="n">Module 2</div><h3>Credential exposure</h3><p>Detects GPP cpassword, exposed <code>.env</code>/<code>.git</code>, history/registry secrets — <b>reports the path, never the secret</b>.</p></div>
+    <div class="card"><div class="n">Module 3</div><h3>Chaining engine</h3><p>Deterministic decision-trees derive multi-step attack paths, each tagged <code>proof: observed | theoretical</code>.</p></div>
+    <div class="card"><div class="n">Module 3b</div><h3>Planner loop</h3><p>observe → plan → <b>authorize</b> → collect → re-plan, bounded by budget/depth. Guardrail vets every step.</p></div>
+    <div class="card" style="border-left:3px solid var(--red)"><div class="n">PoC verifier</div><h3>Lab-only, 3-gate</h3><p>Armed <b>and</b> in <code>AEGIS_LAB_NET</code> <b>and</b> isolation-attested — connect/read-only probes, never against clinical scope.</p></div>
+  </div>
+</section>
+
+<section class="wrap reveal">
+  <h2><b>Security posture</b> — strict by default</h2>
+  <p class="lead">Built for a internal enterprise network: read-only, isolated, least-privilege, auditable.</p>
+  <div class="sec"><span class="chk">✓</span><span><b>Read-only everywhere.</b> No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>Sandbox-first.</b> Targets run on an internet-and-LAN-isolated network; live work requires written authorization + CIDR scope + sensitive/regulated systems exclusions.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>Least privilege &amp; strict transport.</b> Dedicated read-only audit accounts; WinRM defaults to HTTPS with cert validation; SSH key-auth preferred.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>Credentials never logged.</b> The audit records only the check + target; secrets and PHI are redacted from all output.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>Tamper-evident.</b> HMAC-chained audit trail; <code>aegis audit</code> verifies the chain end-to-end.</span></div>
+  <div class="sec"><span class="chk">✓</span><span><b>PHI-safe AI.</b> Local Ollama keeps sensitive data on-host; cloud Claude is reserved for offline report-writing.</span></div>
+</section>
+
+<footer class="wrap">
+  Argus · authorized internal security testing only · generated architecture overview
+</footer>
+
+<script>
+  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

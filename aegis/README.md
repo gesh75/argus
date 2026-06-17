@@ -1,29 +1,123 @@
-# Argus — AI-Driven Internal Pentest Orchestrator
+<p align="center"><img src="docs/assets/hero.svg" alt="Argus — agentic AI penetration testing" width="100%"></p>
 
-Authorized, **sandbox-first** AI pentest tool for an internal enterprise (security / HIPAA). Read-only recon by
-default, a hardened 7-layer guardrail, cost-aware two-pass AI analysis, and reports that drop
-straight into your remediation tracker. CLI **and** web GUI.
+# Argus
 
-> ⚠️ Authorized internal security testing only. Run against the isolated lab (`../targets`) first.
-> Live use requires written authorization, a defined CIDR scope, and the sensitive/regulated systems exclusion list.
+> **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
 
-## Install
+![tests](https://img.shields.io/badge/tests-72%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.14-3776ab)
+![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
+![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
+![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
+![scope](https://img.shields.io/badge/scope-network%20%C2%B7%20host%20%C2%B7%20AD%20%C2%B7%20web-1f6feb)
+
+Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus is built the other way around** — every action flows through a 7-layer fail-closed guardrail first, an agent loop decides what to run next from the evidence it has, and a deterministic engine chains findings into multi-step attack paths. The result is safe enough to run near regulated systems and smart enough to find what a checklist misses.
+
+---
+
+## Why it exists
+
+If you have watched an "AI security tool" hallucinate a critical finding with no evidence, or refuse to run anywhere near production because it might break something — this is the antidote.
+
+- **The agent proposes, the guardrail disposes.** Every step the planner chooses is re-authorized by the guardrail: scope, tool firewall, budget, audit. Autonomy can never escape the authorized CIDR, arm an exploit, or touch a denied tool — no matter what the model "reasons."
+- **Read-only by default.** No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only. The one component that can emit beyond recon — the PoC verifier — is triple-gated to an isolated lab.
+- **Evidence or it didn't happen.** Every attack path is tagged `proof: observed` (every link backed by collected evidence) or `proof: theoretical` (plausible, not yet demonstrated). No silent guesses.
+- **Your data stays put.** Switchable AI brain: cloud Claude, local Ollama (PHI-safe, $0), or a fully offline heuristic engine that always works with no network.
+- **Tamper-evident.** Every authorize / exec / deny is written to an HMAC-SHA256 chained audit log; `argus audit` replays and verifies the whole chain.
+
+## How it works
+
+```
+targets ─▶ guardrail ─▶ sandbox ─▶ collectors ─▶ AI triage ─▶ chain reasoning ─▶ report
+           (fail-       (internal  (network·host  (Haiku→      (observed |        (CSV·MD·
+            closed)      Docker)    ·AD·web)        Sonnet)      theoretical)       JSON)
+                 ▲                                                   │
+                 └────────────── agentic re-plan loop ◀──────────────┘
+                        observe → decide next action → AUTHORIZE → collect → repeat
+```
+
+The agent only ever proposes a profile to run next; the guardrail authorizes it before anything executes. That single rule is what makes autonomy safe in a sensitive network.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    OP["🎛️ Operator Console — CLI + FastAPI GUI"] --> GR
+    subgraph GR["🛡️ Guardrail — 7 layers, fail-closed"]
+      direction LR
+      G1[Scope guard] --> G2[Tool firewall] --> G3[Arg hygiene] --> G4[Budget/time] --> G5[HMAC audit] --> G6[Output sanitizer]
+    end
+    GR --> SB["📦 Sandbox — internal Docker net, argv-only exec"]
+    SB --> CO["🔬 Collectors, read-only — network · Linux/SSH · Windows/WinRM · AD/LDAP · web"]
+    CO --> EN["✨ Enrichment — shadow-AI · segmentation · cred-exposure"]
+    EN --> AI["🧠 AI triage to correlation — Claude · Ollama · offline"]
+    AI --> CH["🔗 Chaining engine — proof: observed or theoretical"]
+    CH --> RP["📊 Report — CSV · Markdown · JSON"]
+    AI -. re-plan .-> PL["🤖 Planner loop"]
+    PL -. next action .-> GR
+```
+
+## The agentic loop
+
+```mermaid
+flowchart LR
+    O["observe — evidence set"] --> D["decide — next read-only profile"]
+    D --> A{"🛡️ guardrail authorize?"}
+    A -- denied --> X["skip + audit"]
+    A -- allowed --> C["collect in sandbox"]
+    C --> R{"new evidence? budget? depth?"}
+    R -- continue --> O
+    R -- stop --> F["chain + report"]
+    X --> R
+```
+
+## Capabilities
+
+| Domain | What Argus does |
+|---|---|
+| 🌐 **Network** | 16 read-only tools across 9 profiles — nmap, masscan, nuclei, sslscan, whatweb, enum4linux-ng, smbmap, snmp, ldapsearch |
+| 🐧 **Host · Linux** | credentialed SSH audit — SUID/GTFOBins, NOPASSWD sudo, weak sshd, world-writable, Lynis |
+| 🪟 **Host · Windows** | WinRM audit — SMB signing, AlwaysInstallElevated, unquoted services, WDigest, UAC, LAPS |
+| 🗂️ **Active Directory** | anonymous LDAP enumeration — RootDSE disclosure, null-bind, user enum |
+| 🕸️ **Web / API** | curated read-only probe — `.env`, `.git`, actuator, Swagger/OpenAPI surface |
+| 🧩 **Segmentation** | flags database / management / directory planes reachable from a user VLAN |
+| 🤖 **Shadow-AI** | discovers ungoverned local LLMs/notebooks — Ollama, Jupyter, Gradio, vLLM, vector DBs |
+| 🔑 **Credential exposure** | detects GPP cpassword, exposed secrets — reports the **path**, never the secret |
+| 🔗 **Chain reasoning** | deterministic decision-trees derive multi-step attack paths with proof annotations |
+
+## Why it's different
+
+| | Typical "AI scanner" | **Argus** |
+|---|---|---|
+| Safety model | run, then hope | **fail-closed guardrail authorizes every action** |
+| Autonomy | linear checklist | **agent re-plans from evidence, still guardrail-bounded** |
+| Findings | isolated, often unverified | **chained attack paths, tagged observed/theoretical** |
+| AI privacy | cloud-only | **Claude · local Ollama · fully offline** |
+| Exploitation | active by default | **read-only; PoC is triple-gated to an isolated lab** |
+| Auditability | logs, maybe | **HMAC-chained, tamper-evident, self-verifying** |
+
+## Quickstart
+
 ```bash
 cd aegis
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 export PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32)   # required — refuses to run unaudited
-```
-Optional AI: `export ANTHROPIC_API_KEY=...` (without it, a deterministic heuristic analyzer runs offline).
+# optional AI: export ANTHROPIC_API_KEY=…   or   export AEGIS_OLLAMA_MODEL=qwen2.5:7b-instruct
 
-## CLI
-```bash
-python -m aegis verify                                   # print loaded policy
-python -m aegis scan 172.30.0.10 172.30.0.11 --dry-run   # policy test, no execution
-python -m aegis scan 172.30.0.10                         # live recon against the lab
-python -m aegis audit                                    # verify HMAC audit chain
+# Web console + animated architecture page
+uvicorn aegis.web:app --host 127.0.0.1 --port 8800      # http://127.0.0.1:8800
+
+# Or the CLI
+python -m aegis scan  172.30.0.10 172.30.0.11 --profile full   # network recon + AI
+python -m aegis web   172.30.0.11                              # web/API recon
+python -m aegis agent 172.30.0.11 --seed network              # agentic loop
+python -m aegis host  172.30.0.20                             # Linux host audit
+python -m aegis ad    172.30.0.21                            # AD/LDAP
+python -m aegis audit                                       # verify the HMAC chain
 ```
-Out-of-scope / obfuscated targets are refused before anything executes:
+
+Out-of-scope or obfuscated targets are refused before anything executes:
+
 ```
 $ python -m aegis scan 10.0.0.5 --dry-run
 REFUSED target 10.0.0.5: scope: 10.0.0.5/32 outside allowed scope
@@ -31,38 +125,25 @@ $ python -m aegis scan 167772165 --dry-run     # decimal-encoded 10.0.0.5
 REFUSED target 167772165: scope: 10.0.0.5/32 outside allowed scope
 ```
 
-## Web GUI
+## Security posture
+
+> **Read-only everywhere** except a hard-gated PoC verifier. Credentialed checks use null/guest/audit accounts. WinRM defaults to HTTPS + cert validation; SSH key-auth preferred. Credentials are **never** logged — the audit records only the check + target; secrets and sensitive data are redacted from all output. The PoC runner refuses unless **all three** gates pass: armed (`--arm poc`) **and** target inside `AEGIS_LAB_NET` **and** `AEGIS_POC_CONFIRM_ISOLATED=1`. Before any live use: written authorization + CIDR scope + exclusions for regulated systems. See [`SECURITY.md`](SECURITY.md).
+
+## Tests
+
+72 passing — guardrail (21), agent/chains/planner/PoC (15), Windows+AD (8), web recon (8), recon modules (8), Linux host (6), heuristics (4), end-to-end integration (2).
+
 ```bash
-uvicorn aegis.web:app --host 127.0.0.1 --port 8800
-# open http://127.0.0.1:8800
-```
-Launch scans, view KPIs (findings, high/crit, AI $ cost, audit status), attack paths, PHI exposure,
-and a sortable findings table — all behind the same guardrail.
-
-## Architecture
-```
-cli.py / web.py ──> orchestrator.py ──> guardrail.py (7 layers, fail-closed)
-                                  │              └─ audit.ndjson (HMAC-chained)
-                                  ├──> sandbox.py (docker exec, argv-only, OS timeout)
-                                  ├──> tools.py   (read-only recon + parsers, defusedxml)
-                                  └──> ai_analyzer.py (Haiku triage → Sonnet correlate, offline fallback)
-                                                 └──> reporting.py (CSV/MD/JSON → tickets)
+PENTEST_AUDIT_HMAC_KEY=test python -m pytest -q
 ```
 
-## Guardrail (Phantom 7-layer, hardened by adversarial review)
-1. **Scope guard** — targets canonicalized (decimal/hex/octal/leading-zero) then `subnet_of` the
-   allowed `/24`; CIDRs must be ≥/24 with no host bits; **default-deny** on anything unparseable.
-2. **Tool firewall** — `default: deny`; dangerous flags (`--script`, `-iL`, `-x`, `--config`, `@file`)
-   and armed-only tools (mitm6/responder/exploit) blocked unless `--arm`.
-3. **Sandbox** — argv-only exec (never a shell) in the `--internal` lab network; OS-level timeouts.
-4–5. **Budget** — wall-clock + token + $ ceilings, monotonic ledger.
-6. **HMAC audit** — SHA-256 chained, tamper-evident (`aegis audit` verifies).
-7. **Output sanitizer** — redacts secrets/PHI (passwords, SSN, MRN) before findings are stored.
+## Docs
 
-Tested: `python -m pytest -q` (16 tests prove the bypass holes are closed).
+- [`docs/AGENTIC_ROADMAP.md`](docs/AGENTIC_ROADMAP.md) — the agentic design and module map
+- [`BUILD_AND_TEST_LOG.md`](BUILD_AND_TEST_LOG.md) — full build + live-validation record
+- [`SECURITY.md`](SECURITY.md) — the strict posture contract
+- `/architecture` — animated architecture page (served by the web console)
 
-## Production hardening TODO (documented, not yet wired)
-- Move the HMAC key to a separate signer process; make `audit.ndjson` OS-append-only (`chattr +a`/WORM)
-  owned by a different uid; anchor the chain head externally.
-- Two-node isolation: run offensive workers on a separate disposable Docker host.
-- Curated NSE allowlist if `nmap --script` recon is needed (currently armed-only).
+---
+
+<p align="center"><sub>Argus · authorized internal security testing only · the agent proposes, the guardrail disposes</sub></p>

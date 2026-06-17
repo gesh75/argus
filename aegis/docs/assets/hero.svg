@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0e14"/>
+      <stop offset="1" stop-color="#0d1320"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.1" r="0.7">
+      <stop offset="0" stop-color="#58a6ff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#58a6ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.05" cy="1" r="0.6">
+      <stop offset="0" stop-color="#3fb950" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#3fb950" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="0.55" stop-color="#3fb950"/>
+      <stop offset="1" stop-color="#bc8cff"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0a0e14"/>
+      <stop offset="0.45" stop-color="#0a0e14"/>
+      <stop offset="0.55" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#1f6feb"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="320" fill="url(#bg)"/>
+  <rect width="1200" height="320" fill="url(#glow)"/>
+  <rect width="1200" height="320" fill="url(#glow2)"/>
+
+  <!-- all-seeing eye motif (Argus) -->
+  <g transform="translate(1000,150)" opacity="0.92">
+    <path d="M-110,0 Q0,-78 110,0 Q0,78 -110,0 Z" fill="none" stroke="#243043" stroke-width="2.5"/>
+    <circle cx="0" cy="0" r="42" fill="url(#iris)"/>
+    <circle cx="0" cy="0" r="15" fill="#0a0e14"/>
+    <circle cx="-6" cy="-6" r="5" fill="#9ad1ff" opacity="0.85"/>
+    <!-- surrounding lesser eyes (hundred-eyed) -->
+    <g fill="#3fb950" opacity="0.55">
+      <circle cx="-150" cy="-46" r="4"/><circle cx="150" cy="-46" r="4"/>
+      <circle cx="-150" cy="46" r="4"/><circle cx="150" cy="46" r="4"/>
+      <circle cx="0" cy="-92" r="4"/><circle cx="0" cy="92" r="4"/>
+    </g>
+  </g>
+
+  <!-- title block -->
+  <text x="80" y="150" font-size="92" font-weight="800" fill="url(#title)" letter-spacing="2">ARGUS</text>
+  <text x="84" y="196" font-size="23" font-weight="600" fill="#e6edf3">Agentic AI penetration testing — it reasons, chains, and adapts.</text>
+  <text x="84" y="228" font-size="16" fill="#8b949e">Read-only by default · fail-closed 7-layer guardrail · sandbox-first · HMAC-audited</text>
+
+  <!-- feature pills -->
+  <g font-size="13" fill="#c9d4e0">
+    <g><rect x="84" y="252" width="186" height="30" rx="15" fill="#11161f" stroke="#222b38"/><text x="100" y="271">🛡️ guardrail-bounded agent</text></g>
+    <g><rect x="282" y="252" width="172" height="30" rx="15" fill="#11161f" stroke="#222b38"/><text x="298" y="271">🔬 network · host · AD · web</text></g>
+    <g><rect x="466" y="252" width="150" height="30" rx="15" fill="#11161f" stroke="#222b38"/><text x="482" y="271">🧠 chains attack paths</text></g>
+    <g><rect x="628" y="252" width="150" height="30" rx="15" fill="#11161f" stroke="#222b38"/><text x="644" y="271">🏷️ proof: observed</text></g>
+  </g>
+</svg>
