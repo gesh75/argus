@@ -1,0 +1,21 @@
+dn: ou=people,dc=ecp,dc=lab
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=jsmith,ou=people,dc=ecp,dc=lab
+objectClass: inetOrgPerson
+cn: John Smith
+sn: Smith
+uid: jsmith
+
+dn: uid=agarcia,ou=people,dc=ecp,dc=lab
+objectClass: inetOrgPerson
+cn: Ana Garcia
+sn: Garcia
+uid: agarcia
+
+dn: uid=svc-backup,ou=people,dc=ecp,dc=lab
+objectClass: inetOrgPerson
+cn: Backup Service
+sn: Service
+uid: svc-backup

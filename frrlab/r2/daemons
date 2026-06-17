@@ -1,0 +1,8 @@
+# FRR daemons — r2. Default is all 'no'; enable what the lab needs.
+zebra=yes
+ospfd=yes
+bgpd=no
+staticd=yes
+vtysh_enable=yes
+zebra_options="  -A 127.0.0.1 -s 90000000"
+ospfd_options=" -A 127.0.0.1"

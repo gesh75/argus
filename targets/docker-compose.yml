@@ -1,0 +1,83 @@
+# ECP Aegis — isolated vulnerable-target lab (Phase 1, Mac Apple Silicon)
+# Up:        docker compose up -d
+# Attack:    docker compose exec attacker bash   (then nmap 172.30.0.0/24)
+# Down:      docker compose down
+#
+# Safety: 'ptlab' uses internal:true -> NO route to host LAN or internet.
+# Published ports are bound to 127.0.0.1 only, so nothing is exposed on the real LAN.
+
+networks:
+  ptlab:
+    driver: bridge
+    internal: true                 # hard boundary: lab cannot reach LAN/internet
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
+
+services:
+  # 1) Modern web/API target — NATIVE arm64
+  juiceshop:
+    image: bkimminich/juice-shop:latest
+    networks: { ptlab: { ipv4_address: 172.30.0.10 } }
+    ports: ["127.0.0.1:3000:3000"]
+    restart: unless-stopped
+
+  # 2) Classic web (SQLi/XSS/upload) — arm64-native DVWA fork
+  dvwa:
+    image: ghcr.io/digininja/dvwa:latest      # swap to cytopia/dvwa:latest if preferred
+    networks: { ptlab: { ipv4_address: 172.30.0.11 } }
+    ports: ["127.0.0.1:8080:80"]
+    restart: unless-stopped
+
+  # 3) Network SMB service (SambaCry CVE-2017-7494 class) — compiles on arm64
+  smb:
+    image: servercontainers/samba:latest
+    environment:
+      ACCOUNT_pentest: pentest
+      UID_pentest: "1000"
+      SAMBA_VOLUME_CONFIG_share: "[public]; path=/share; guest ok = yes; read only = no; browseable = yes"
+    networks: { ptlab: { ipv4_address: 172.30.0.12 } }
+    ports: ["127.0.0.1:139:139", "127.0.0.1:445:445"]
+    restart: unless-stopped
+
+  # 4) Misconfigured Linux SSH host — target for the credentialed host-audit module
+  linuxhost:
+    build:
+      context: .
+      dockerfile: linuxhost.Dockerfile
+    networks: { ptlab: { ipv4_address: 172.30.0.20 } }
+    restart: unless-stopped
+
+  # 5) OpenLDAP with anonymous bind — target for the AD/LDAP module
+  openldap:
+    build:
+      context: .
+      dockerfile: openldap.Dockerfile
+    networks: { ptlab: { ipv4_address: 172.30.0.21 } }
+    restart: unless-stopped
+
+  # 6) (optional) amd64-only backdoored FTP via emulation — uncomment to enable
+  # vsftpd:
+  #   build: https://github.com/vitalyford/vsftpd-2.3.4-vulnerable.git
+  #   platform: linux/amd64                  # Rosetta/QEMU (enable Rosetta in Docker Desktop)
+  #   networks: { ptlab: { ipv4_address: 172.30.0.13 } }
+  #   ports: ["127.0.0.1:21:21", "127.0.0.1:6200:6200"]
+
+  # SSH-helper for credentialed host audits (Debian-based, Kali-mirror-independent).
+  sshhelper:
+    build:
+      context: .
+      dockerfile: sshhelper.Dockerfile
+    networks: { ptlab: {} }
+    restart: "no"
+
+  # Attacker box on the same isolated net (in-lab scanning).
+  # Tools are baked in at build time; runtime stays on the internet-isolated network.
+  attacker:
+    build:
+      context: .
+      dockerfile: attacker.Dockerfile
+    networks: { ptlab: {} }
+    cap_add: ["NET_RAW", "NET_ADMIN"]
+    restart: "no"

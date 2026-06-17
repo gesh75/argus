@@ -1,0 +1,12 @@
+# Core
+PyYAML>=6.0
+defusedxml>=0.7.1
+# AI analysis (optional at runtime — pipeline falls back to heuristics without a key)
+anthropic>=0.40.0
+# Host audit (Windows/WinRM). Linux uses SSH via the sandbox; AD uses ldapsearch.
+pywinrm>=0.4.3
+# Web GUI
+fastapi>=0.110
+uvicorn[standard]>=0.29
+# Dev/test
+pytest>=8.0

@@ -1,0 +1,67 @@
+# ECP Aegis — Phantom 7-layer scope/guardrail policy
+# Consumed by the tool-wrapper that sits between the LLM agent and every tool exec.
+# Layers: 1 scope guard · 2 tool firewall · (3 sandbox = docker --internal) ·
+#         4 cost · 5 time · 6 HMAC audit · 7 output sanitizer.
+version: 1
+
+scope:                              # Layer 1 — scope guard (pre-exec target check)
+  allowed_cidrs:
+    - "172.30.0.0/24"              # lab subnet ONLY — must equal docker --subnet
+  denied_cidrs:                     # belt-and-suspenders blocklist
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+    - "172.16.0.0/12"             # (except the carved-out lab /24 above)
+    - "169.254.0.0/16"
+    - "0.0.0.0/0"                 # default-deny everything else
+  resolve_dns: false                # no name resolution -> cannot pivot off-subnet
+
+tool_firewall:                      # Layer 2 — fail closed
+  default: deny
+  allowed:                          # read-only recon binaries (Aegis curated arsenal)
+    - nmap
+    - masscan
+    - fping
+    - nbtscan
+    - nuclei
+    - whatweb
+    - wafw00f
+    - nikto
+    - sslscan
+    - testssl.sh
+    - enum4linux-ng
+    - smbmap
+    - ldapsearch
+    - onesixtyone
+    - snmpwalk
+    - snmp-check
+    - gobuster
+    - sqlmap
+  armed_only:                       # require --arm + signed token to run
+    - responder
+    - mitm6
+    - bettercap
+    - "metasploit:exploit/*"
+    - "metasploit:auxiliary/spoof/*"
+  denied:                           # never, even when armed
+    - "metasploit:post/*/persistence"
+    - dnscat2
+
+budget:                             # Layers 4 + 5
+  max_wall_seconds: 3600
+  max_usd: 5.00
+  max_tokens: 2000000
+  on_breach: kill_and_sign
+
+audit:                              # Layer 6 — tamper-evident
+  algo: HMAC-SHA256
+  key_env: PENTEST_AUDIT_HMAC_KEY   # injected into wrapper, NOT the container
+  chained: true                     # entry_hmac = HMAC(prev_hmac || entry)
+  # Local-dev default (project-relative). For production, point at an OS-append-only
+  # (chattr +a / WORM) path owned by a different uid than the tool runner.
+  path: aegis/output/audit.ndjson
+
+output_sanitizer:                   # Layer 7
+  redact_patterns:
+    - "(?i)password[=:]\\S+"
+    - "(?i)ssn[=:]?\\s*\\d{3}-?\\d{2}-?\\d{4}"
+    - "(?i)mrn[=:]?\\s*\\d+"        # PHI: medical record numbers

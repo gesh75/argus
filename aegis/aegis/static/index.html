@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECP Aegis — Pentest Console</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--fg:#e6edf3;--mut:#8b949e;
+        --crit:#f85149;--high:#ff8a50;--med:#e3b341;--low:#58a6ff;--info:#6e7681;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);
+    background:radial-gradient(1200px 600px at 80% -10%,rgba(88,166,255,.08),transparent 60%),
+               radial-gradient(900px 500px at -10% 110%,rgba(63,185,80,.06),transparent 55%),var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  header{padding:14px 24px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;gap:12px;position:sticky;top:0;z-index:10;
+    background:rgba(13,17,23,.72);backdrop-filter:saturate(160%) blur(12px)}
+  header h1{font-size:18px;margin:0;background:linear-gradient(90deg,#58a6ff,#3fb950);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:12px;padding:2px 10px}
+  main{display:grid;grid-template-columns:340px 1fr;gap:0;min-height:calc(100vh - 57px)}
+  .side{border-right:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  label{display:block;font-size:12px;color:var(--mut);margin-bottom:6px}
+  textarea,input,select{width:100%;background:#0d1117;border:1px solid var(--line);border-radius:8px;
+    color:var(--fg);padding:9px;font-family:ui-monospace,Menlo,monospace}
+  textarea{min-height:84px;resize:vertical}
+  .row{display:flex;align-items:center;gap:8px;margin-top:10px}
+  button{background:linear-gradient(180deg,#2ea043,#238636);border:0;color:#fff;padding:10px 16px;
+    border-radius:8px;font-weight:600;cursor:pointer;width:100%;
+    transition:filter .12s ease,transform .06s ease}
+  button:hover{filter:brightness(1.08)} button:active{transform:translateY(1px)}
+  button.sec{background:#21262d;border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:wait}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--low);
+    box-shadow:0 0 0 3px rgba(88,166,255,.25)}
+  .content{padding:24px;overflow:auto}
+  .kpis{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+    border-radius:10px;padding:12px 16px;min-width:112px;box-shadow:0 1px 3px rgba(0,0,0,.3);
+    transition:transform .12s ease,box-shadow .12s ease}
+  .kpi:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.35)}
+  .kpi.k-blue{border-left-color:var(--low)} .kpi.k-red{border-left-color:var(--crit)}
+  .kpi.k-amber{border-left-color:var(--med)} .kpi.k-green{border-left-color:var(--ok)}
+  .kpi b{font-size:22px;display:block} .kpi span{font-size:11px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;margin-top:6px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase}
+  .sev{font-weight:700;padding:1px 8px;border-radius:10px;font-size:11px}
+  .Critical{background:rgba(248,81,73,.15);color:var(--crit)} .High{background:rgba(255,138,80,.15);color:var(--high)}
+  .Medium{background:rgba(227,179,65,.15);color:var(--med)} .Low{background:rgba(88,166,255,.15);color:var(--low)}
+  .Info{background:rgba(110,118,129,.15);color:var(--info)}
+  .muted{color:var(--mut)} .ok{color:var(--ok)} .err{color:var(--crit)}
+  h2{font-size:14px;border-bottom:1px solid var(--line);padding-bottom:8px;margin:22px 0 6px}
+  .path{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--high);
+    border-radius:8px;padding:12px;margin:8px 0}
+  code{background:#0d1117;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+  tbody tr:hover,table tr:hover{background:rgba(88,166,255,.05)}
+  @media (max-width:900px){
+    main{grid-template-columns:1fr} .side{border-right:0;border-bottom:1px solid var(--line)}
+    .content{padding:16px} .kpis{overflow-x:auto} table{display:block;overflow-x:auto;white-space:nowrap}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡️ ECP Aegis</h1><span class="tag">Authorized internal pentest · sandbox-first</span>
+  <span class="tag" id="scope">scope…</span>
+  <a class="tag" href="/architecture" target="_blank" style="margin-left:auto;text-decoration:none">📐 Architecture</a>
+</header>
+<main>
+  <div class="side">
+    <div class="card">
+      <label>Scan type</label>
+      <select id="scantype">
+        <option value="network">Network</option>
+        <option value="host-linux">Host · Linux (SSH)</option>
+        <option value="host-windows">Host · Windows (WinRM)</option>
+        <option value="ad">Active Directory (LDAP)</option>
+      </select>
+      <label style="margin-top:12px"><span id="tgtlabel">Targets (one per line — lab subnet only)</span></label>
+      <textarea id="targets">172.30.0.10
+172.30.0.11
+172.30.0.12</textarea>
+      <div id="credblock" style="display:none">
+        <label style="margin-top:10px">Credentials (read-only audit account)</label>
+        <input id="huser" placeholder="user" value="pentest">
+        <input id="hpass" type="password" placeholder="password" value="pentest" style="margin-top:6px">
+      </div>
+      <div id="adblock" style="display:none">
+        <label style="margin-top:10px">LDAP base DN</label>
+        <input id="adbase" value="dc=ecp,dc=lab">
+      </div>
+      <label style="margin-top:12px"><span id="proflabel">Scan profile</span></label>
+      <select id="profile"></select>
+      <div id="profhint" class="muted" style="font-size:11px;margin-top:4px"></div>
+      <label style="margin-top:12px">AI analysis</label>
+      <select id="provider"></select>
+      <select id="omodel" style="margin-top:6px;display:none"></select>
+      <div class="row"><input type="checkbox" id="dry" checked style="width:auto">
+        <label style="margin:0" id="drylabel">Dry-run (policy test, no execution)</label></div>
+      <div class="row" style="margin-top:14px"><button id="run">▶ Run scan</button></div>
+      <div class="row"><button class="sec" id="loadpol">Reload</button></div>
+    </div>
+    <div class="card">
+      <label>Guardrail</label>
+      <div id="polbox" class="muted" style="font-size:12px">loading…</div>
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:auto">
+      All scans pass the 7-layer guardrail. Out-of-scope or obfuscated targets are refused
+      before execution. Audit chain is HMAC-verified each run.</div>
+  </div>
+  <div class="content">
+    <div class="kpis" id="kpis"></div>
+    <div id="out" class="muted">Run a scan to see findings.</div>
+  </div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+let PROFILES={};
+async function loadPolicy(){
+  const p=await (await fetch('/api/policy')).json();
+  PROFILES=p.profiles||{};
+  $('#scope').textContent='scope: '+p.allowed.join(', ');
+  $('#polbox').innerHTML=`default: <code>${p.tool_default}</code> · ${p.tool_count} tools<br>budget: $${p.budget.usd} / ${p.budget.wall_s}s`;
+  const ps=$('#profile'); ps.innerHTML='';
+  Object.keys(PROFILES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k+' ('+PROFILES[k].length+')';ps.appendChild(o);});
+  ps.onchange=()=>{$('#profhint').textContent=(PROFILES[ps.value]||[]).join(', ');};
+  ps.onchange();
+  await loadModels();
+}
+async function loadModels(){
+  const m=await (await fetch('/api/models')).json();
+  const pv=$('#provider'); pv.innerHTML='';
+  const opts=[];
+  if(m.anthropic) opts.push(['anthropic','Claude (Haiku→Sonnet)']);
+  if(m.ollama) opts.push(['ollama','Local (Ollama)']);
+  opts.push(['heuristic','Offline heuristic']);
+  opts.forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l+(v===m.active?' · active':'');pv.appendChild(o);});
+  pv.value=m.active;
+  const om=$('#omodel'); om.innerHTML='';
+  (m.ollama_models||[]).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;om.appendChild(o);});
+  const sync=()=>{om.style.display=(pv.value==='ollama'&&om.options.length)?'block':'none';};
+  pv.onchange=sync; sync();
+}
+function kpi(n,l,a){return `<div class="kpi ${a||''}"><b>${n}</b><span>${l}</span></div>`}
+const STATIC_PROFILES={'host-linux':['host-linux','host-linux-quick'],
+  'host-windows':['host-windows','host-windows-quick'],'ad':[]};
+function onType(){
+  const t=$('#scantype').value;
+  $('#credblock').style.display=(t==='host-linux'||t==='host-windows')?'block':'none';
+  $('#adblock').style.display=(t==='ad')?'block':'none';
+  $('#tgtlabel').textContent=(t==='network')?'Targets (one per line — lab subnet only)':'Target (single host)';
+  const dl=$('#drylabel'), dr=$('#dry').parentElement;
+  if(t==='host-windows'){ dl.textContent='Use vulnerable-Windows fixture (no live host)'; $('#dry').checked=true; dr.style.display='flex'; }
+  else if(t==='network'){ dl.textContent='Dry-run (policy test, no execution)'; dr.style.display='flex'; }
+  else { dr.style.display='none'; }   // host-linux / ad always execute
+  const lbl=$('#proflabel').parentElement, ps=$('#profile');
+  if(t==='ad'){ ps.style.display='none'; lbl.style.display='none'; $('#profhint').textContent=''; return; }
+  ps.style.display='block'; lbl.style.display='block';
+  const keys=(t==='network')?Object.keys(PROFILES):STATIC_PROFILES[t];
+  ps.innerHTML=''; keys.forEach(k=>{const o=document.createElement('option');o.value=k;
+    o.textContent=k+(PROFILES[k]?' ('+PROFILES[k].length+')':'');ps.appendChild(o);});
+  ps.onchange=()=>{$('#profhint').textContent=(PROFILES[ps.value]||[]).join(', ');}; ps.onchange();
+}
+async function run(){
+  const btn=$('#run'); btn.disabled=true; btn.textContent='Scanning…';
+  const type=$('#scantype').value;
+  const targets=$('#targets').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const prov=$('#provider').value;
+  const omodel=(prov==='ollama'&&$('#omodel').value)?$('#omodel').value:null;
+  let url,body;
+  if(type==='network'){ url='/api/scan';
+    body={targets,dry_run:$('#dry').checked,profile:$('#profile').value,provider:prov}; }
+  else if(type==='ad'){ url='/api/ad';
+    body={target:targets[0],base:$('#adbase').value,provider:prov}; }
+  else { url='/api/host';
+    body={target:targets[0],os:(type==='host-windows'?'windows':'linux'),
+          user:$('#huser').value,password:$('#hpass').value,profile:$('#profile').value,
+          dry_run:(type==='host-windows'&&$('#dry').checked),provider:prov}; }
+  if(omodel) body.ollama_model=omodel;
+  let r;
+  try{ r=await (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify(body)})).json(); }
+  catch(e){ $('#out').innerHTML='<span class="err">request failed</span>'; btn.disabled=false; btn.textContent='▶ Run scan'; return; }
+  btn.disabled=false; btn.textContent='▶ Run scan';
+  if(r.error){ $('#out').innerHTML=`<span class="err">⛔ ${r.error}</span>`; $('#kpis').innerHTML=''; return; }
+  const F=r.findings||[], sev=s=>F.filter(f=>f.severity===s).length;
+  $('#kpis').innerHTML=[kpi(F.length,'findings','k-blue'),
+    kpi(sev('Critical')+sev('High'),'high/crit','k-red'),
+    kpi('$'+r.usd,'AI cost','k-amber'),kpi(r.mode,'mode','k-green'),
+    kpi(r.audit_valid?'✓':'✗','audit chain','k-blue')].join('');
+  let h='';
+  const c=r.correlation||{};
+  if(c.executive_summary){h+=`<h2>Executive summary</h2><p>${c.executive_summary}</p>`;}
+  (c.attack_paths||[]).forEach(p=>{h+=`<div class="path"><b>${p.name} — ${p.severity}</b><ul>${(p.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ul><span class="muted">${p.business_risk||''}</span></div>`;});
+  if((c.phi_exposure||[]).length){h+=`<h2>PHI / HIPAA exposure</h2><p class="muted">${c.phi_exposure.join(', ')}</p>`;}
+  h+='<h2>Findings</h2><table><tr><th>Sev</th><th>Title</th><th>Asset</th><th>CVSS</th><th>MITRE</th><th>Conf</th></tr>';
+  F.sort((a,b)=>({Critical:4,High:3,Medium:2,Low:1,Info:0}[b.severity]-{Critical:4,High:3,Medium:2,Low:1,Info:0}[a.severity]));
+  F.forEach(f=>{h+=`<tr><td><span class="sev ${f.severity}">${f.severity}</span></td><td>${f.title}</td><td><code>${f.affected_asset||'?'}</code></td><td class="muted" style="font-size:11px">${f.cvss31_vector}</td><td class="muted">${f.mitre_attack}</td><td class="muted">${f.confidence}</td></tr>`;});
+  h+='</table>';
+  if(F.length){
+    h+='<h2>Remediation playbook (step-by-step)</h2>';
+    F.forEach(f=>{
+      const steps=(f.mitigation_steps&&f.mitigation_steps.length)?f.mitigation_steps:[f.remediation||'Review and remediate.'];
+      h+=`<div class="path" style="border-left-color:var(--ok)"><b><span class="sev ${f.severity}">${f.severity}</span> ${f.title}</b>`;
+      const meta=[f.affected_asset,f.platform,f.mitre_attack].filter(Boolean).join(' · ');
+      if(meta) h+=`<div class="muted" style="font-size:11px;margin:4px 0">${meta}</div>`;
+      h+='<ol style="margin:6px 0 0 18px;padding:0">'+steps.map(s=>`<li>${s.replace(/^\d+\.\s*/,'')}</li>`).join('')+'</ol></div>';
+    });
+  }
+  if((r.errors||[]).length){h+='<h2>Guardrail denials / errors</h2>'+r.errors.map(e=>`<div class="muted">⛔ ${e}</div>`).join('');}
+  $('#out').innerHTML=h;
+}
+$('#run').onclick=run; $('#loadpol').onclick=loadPolicy;
+$('#scantype').onchange=onType;
+loadPolicy().then(onType);
+</script>
+</body>
+</html>

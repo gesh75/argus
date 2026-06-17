@@ -1,0 +1,29 @@
+# ECP Aegis — simulated network lab: 2-router OSPF (FRR, native arm64)
+# Run INSIDE an OrbStack arm64 Linux VM (containerlab is Linux-only).
+#   install:  bash -c "$(curl -sL https://get.containerlab.dev)"
+#   deploy:   sudo containerlab deploy   -t frrlab.clab.yml
+#   inspect:  sudo containerlab inspect  -t frrlab.clab.yml
+#   router:   docker exec -it clab-frrlab-r1 vtysh
+#   destroy:  sudo containerlab destroy   -t frrlab.clab.yml
+name: frrlab
+
+mgmt:                                   # isolated mgmt bridge (auto-created)
+  network: clab-frr
+  ipv4-subnet: 172.31.31.0/24
+
+topology:
+  defaults:
+    kind: linux
+  nodes:
+    r1:
+      image: quay.io/frrouting/frr:10.5.1   # native arm64 — no Rosetta
+      binds:
+        - r1/daemons:/etc/frr/daemons
+        - r1/frr.conf:/etc/frr/frr.conf
+    r2:
+      image: quay.io/frrouting/frr:10.5.1
+      binds:
+        - r2/daemons:/etc/frr/daemons
+        - r2/frr.conf:/etc/frr/frr.conf
+  links:
+    - endpoints: ["r1:eth1", "r2:eth1"]      # point-to-point veth, host-isolated
