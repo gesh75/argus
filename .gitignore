@@ -6,3 +6,7 @@ aegis/output/
 .env
 *.ndjson
 .DS_Store
+
+# internal ECP recon scope (real device IPs — never publish)
+targets/ecp-recon-scope.yaml
+aegis/output/ecp-recon-audit*
