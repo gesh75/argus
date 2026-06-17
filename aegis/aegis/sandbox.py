@@ -39,6 +39,32 @@ class DockerSandbox:
             return ExecResult(124, exc.stdout or "", "timeout", timed_out=True)
 
 
+class LocalSandbox:
+    """Runs each tool directly on the host (argv array, NEVER shell=True).
+
+    For AUTHORIZED off-lab recon only — e.g. scanning approved production
+    devices over a VPN that the isolated lab container cannot route to. This
+    intentionally has no network isolation, so it MUST be paired with a tight
+    scope policy (explicit /32 allow-list + read-only tool firewall); the
+    guardrail still authorizes every target and tool and writes the audit chain
+    before anything here executes. Only binaries present on the host PATH run.
+    """
+
+    def __init__(self) -> None:
+        if not shutil.which("nmap") and not shutil.which("fping"):
+            raise RuntimeError("no recon tools on host PATH (install nmap/fping)")
+
+    def run(self, argv: list[str], timeout: int) -> ExecResult:
+        if not shutil.which(argv[0]):
+            return ExecResult(127, "", f"{argv[0]}: not installed on host")
+        try:
+            p = subprocess.run(argv, capture_output=True, text=True,
+                               timeout=timeout, check=False)  # noqa: S603 (argv, no shell)
+            return ExecResult(p.returncode, p.stdout, p.stderr)
+        except subprocess.TimeoutExpired as exc:
+            return ExecResult(124, exc.stdout or "", "timeout", timed_out=True)
+
+
 class DryRunSandbox:
     """Records argv without executing — for offline policy testing."""
 

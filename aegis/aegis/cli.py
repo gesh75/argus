@@ -16,7 +16,7 @@ from .config import DEFAULT_POLICY, Policy
 from .guardrail import Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
-from .sandbox import DockerSandbox, DryRunSandbox
+from .sandbox import DockerSandbox, DryRunSandbox, LocalSandbox
 
 DEFAULT_COMPOSE = Path(__file__).resolve().parents[2] / "targets" / "docker-compose.yml"
 
@@ -35,7 +35,12 @@ def cmd_scan(args) -> int:
         if not d.allowed:
             print(f"REFUSED target {t}: {d.reason}", file=sys.stderr)
             return 2
-    sandbox = DryRunSandbox() if args.dry_run else DockerSandbox(args.compose)
+    if args.dry_run:
+        sandbox = DryRunSandbox()
+    elif getattr(args, "sandbox", "docker") == "local":
+        sandbox = LocalSandbox()
+    else:
+        sandbox = DockerSandbox(args.compose)
     orch = Orchestrator(guard, sandbox, per_tool_timeout=args.timeout,
                         ai_provider=args.provider, ai_ollama_model=args.ollama_model)
     result = orch.run(default_plan(args.targets, args.profile))
@@ -192,6 +197,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--ollama-model", help="Ollama model, e.g. gemma3:4b, qwen2.5:7b-instruct")
     s.add_argument("--timeout", type=int, default=300)
     s.add_argument("--dry-run", action="store_true")
+    s.add_argument("--sandbox", choices=["docker", "local"], default="docker",
+                   help="docker = isolated lab container (default); "
+                        "local = run read-only tools on the host for AUTHORIZED off-lab "
+                        "recon (requires a tight scope policy)")
     s.set_defaults(func=cmd_scan)
 
     h = sub.add_parser("host", help="credentialed read-only host audit (Linux/SSH or Windows/WinRM)")
