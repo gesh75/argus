@@ -1,5 +1,10 @@
 <p align="center"><img src="aegis/docs/assets/hero.svg" alt="Argus — agentic AI penetration testing" width="100%"></p>
 
+<p align="center">
+  <a href="https://gesh75.github.io/argus/"><img src="docs/assets/preview.png" alt="Argus — live documentation" width="100%"></a>
+</p>
+<p align="center"><b><a href="https://gesh75.github.io/argus/">▶ Open the live architecture site</a></b> · <a href="docs/argus_demo.mp4">▶ Watch the demo</a></p>
+
 # Argus
 
 > **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
