@@ -47,9 +47,15 @@ POC_CATALOG = {
 
 def _in_lab(target: str) -> bool:
     try:
-        net = ipaddress.ip_network(LAB_NET)
-        return ipaddress.ip_address(target.split(":")[0]) in net
-    except ValueError:
+        net = ipaddress.ip_network(LAB_NET, strict=False)
+        addr = ipaddress.ip_address(target.split(":")[0])
+        # normalize IPv4-mapped IPv6 (e.g. ::ffff:172.30.0.5) so it can't dodge an IPv4 lab net
+        if isinstance(addr, ipaddress.IPv6Address):
+            if addr.ipv4_mapped is None:
+                return False
+            addr = addr.ipv4_mapped
+        return addr in net
+    except (ValueError, TypeError):
         return False
 
 

@@ -60,6 +60,24 @@ def test_web_to_host_theoretical_without_service():
     assert w and w[0].proof == "theoretical"
 
 
+def test_relay_chain_theoretical_without_weak_tls():
+    # smb + ad present but no weak-TLS coercion path observed -> theoretical, not observed.
+    findings = [Finding("SMBv1 enabled", "High", affected_asset="172.30.0.11"),
+                Finding("AD/LDAP: anonymous bind", "Medium", affected_asset="172.30.0.21")]
+    cs = chains.derive_chains(findings)
+    relay = [c for c in cs if "relay" in c.name.lower()]
+    assert relay and relay[0].proof == "theoretical"
+
+
+def test_relay_chain_observed_with_weak_tls():
+    findings = [Finding("Weak TLS: SSLv3 enabled", "High", affected_asset="172.30.0.11"),
+                Finding("SMBv1 enabled", "High", affected_asset="172.30.0.11"),
+                Finding("AD/LDAP: anonymous bind", "Medium", affected_asset="172.30.0.21")]
+    cs = chains.derive_chains(findings)
+    relay = [c for c in cs if "relay" in c.name.lower()]
+    assert relay and relay[0].proof == "observed"
+
+
 def test_chains_correlation_shape():
     findings = [Finding("Privesc: SUID", "High", affected_asset="172.30.0.20"),
                 Finding("Exposed service: ssh", "Info", affected_asset="172.30.0.20")]

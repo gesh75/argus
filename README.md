@@ -9,7 +9,7 @@
 
 > **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
 
-![tests](https://img.shields.io/badge/tests-72%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.14-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
@@ -153,7 +153,7 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Tests
 
-72 passing — guardrail (21), agent/chains/planner/PoC (15), Windows+AD (8), web recon (8), recon modules (8), Linux host (6), heuristics (4), end-to-end integration (2).
+75 passing — guardrail (22), agent/chains/planner/PoC (17), Windows+AD (8), web recon (8), recon modules (8), Linux host (6), heuristics (4), end-to-end integration (2).
 
 ```bash
 cd aegis && PENTEST_AUDIT_HMAC_KEY=test python -m pytest -q

@@ -14,6 +14,9 @@ from dataclasses import dataclass, field
 
 from ..ai_analyzer import Finding
 
+# Numeric severity ordering so remediations rank by real risk, not alphabetically.
+_SEV_RANK = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1, "Info": 0}
+
 
 @dataclass
 class Chain:
@@ -52,7 +55,7 @@ def _rule_relay(findings):
             "Coerce/await authentication on the network (LLMNR/NBT-NS or weak TLS path)",
             "Relay captured NTLM auth to a host missing SMB signing",
             "Authenticate to reachable AD/share resources as the relayed identity"], \
-            "observed" if (smb and ad) else "theoretical"
+            "observed" if (smb and ad and tls) else "theoretical"
     return None
 
 
@@ -155,5 +158,6 @@ def chains_to_correlation(findings: list[Finding]) -> dict:
         "phi_exposure": sorted({a for c in chains if c.severity in ("Critical", "High")
                                 for a in c.assets})[:10],
         "top_remediations": [f.remediation for f in
-                             sorted(findings, key=lambda f: f.severity)[:5] if f.remediation],
+                             sorted(findings, key=lambda f: _SEV_RANK.get(f.severity, 0),
+                                    reverse=True)[:5] if f.remediation],
     }

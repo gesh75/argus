@@ -185,9 +185,15 @@ class Guardrail:
 
     # ---- Layer 1: scope guard (default DENY) ---------------------------------
     def _in_scope(self, net: ipaddress.IPv4Network) -> bool:
-        if not any(net.subnet_of(a) for a in self.policy.allowed_networks):
+        allow = [a for a in self.policy.allowed_networks if net.subnet_of(a)]
+        if not allow:
             return False
-        # allowed carve-out wins, but reject if also inside a denied range not covered by allowed
+        # Longest-prefix-match wins (firewall semantics): the most specific matching
+        # rule decides. A lab /24 allow correctly overrides a broad /12 deny, while a
+        # /32 deny carved out *inside* the allowed /24 still wins and is rejected.
+        deny = [d for d in self.policy.denied_networks if net.subnet_of(d)]
+        if deny and max(d.prefixlen for d in deny) >= max(a.prefixlen for a in allow):
+            return False
         return net.prefixlen >= 24 or net.num_addresses == 1
 
     def check_target(self, token: str) -> Decision:

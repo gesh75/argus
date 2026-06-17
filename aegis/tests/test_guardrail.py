@@ -60,6 +60,16 @@ def test_broad_cidr_denied(guard):
     assert not guard.check_target("172.30.0.0/8").allowed
 
 
+def test_denied_carveout_inside_allowed_is_rejected(guard):
+    # A more-specific deny carved out *inside* the allowed lab /24 must win (e.g. a
+    # production/clinical host the operator excluded). Longest-prefix-match: /32 > /24.
+    import ipaddress
+    object.__setattr__(guard.policy, "denied_networks",
+                       guard.policy.denied_networks + (ipaddress.ip_network("172.30.0.50/32"),))
+    assert not guard.check_target("172.30.0.50").allowed     # denied carve-out wins
+    assert guard.check_target("172.30.0.10").allowed         # rest of lab still in scope
+
+
 # ---- authorize(): hostnames, file inputs, NSE, metachars all fail closed ---
 def test_hostname_arg_denied(guard):
     with pytest.raises(GuardrailError):

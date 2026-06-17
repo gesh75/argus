@@ -35,7 +35,7 @@ def resolve_provider(override: str | None = None) -> str:
         return forced
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic"
-    if os.environ.get("AEGIS_OLLAMA_MODEL"):
+    if os.environ.get("AEGIS_OLLAMA_MODEL") and list_ollama_models():
         return "ollama"
     return "heuristic"
 
@@ -52,12 +52,13 @@ def list_ollama_models() -> list[str]:
 
 def available_providers() -> dict:
     """What the GUI can offer right now."""
+    ollama_models = list_ollama_models()
     return {
         "active": resolve_provider(),
         "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "anthropic_models": [TRIAGE_MODEL, CORRELATE_MODEL],
-        "ollama": bool(list_ollama_models()),
-        "ollama_models": list_ollama_models(),
+        "ollama": bool(ollama_models),
+        "ollama_models": ollama_models,
         "heuristic": True,
     }
 

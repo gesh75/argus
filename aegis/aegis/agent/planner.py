@@ -102,10 +102,10 @@ class Planner:
             ok, reason = self._authorize(profile, target)
             step = Step(profile, target, ok, reason)
             done.add(profile)
-            depth += 1
             if not ok:
                 run.steps.append(step)
                 continue
+            depth += 1  # only authorized steps that actually collect consume depth
             obs = self.collect(profile, target) or []
             fresh = [o for o in obs if _signature(o) not in seen]
             for o in fresh:
