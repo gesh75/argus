@@ -37,8 +37,15 @@ def cmd_scan(args) -> int:
             return 2
     if args.dry_run:
         sandbox = DryRunSandbox()
-    elif getattr(args, "sandbox", "docker") == "local":
-        sandbox = LocalSandbox()
+    elif args.sandbox == "local":
+        print("WARNING: --sandbox local runs tools directly on THIS host with NO "
+              "network isolation. Use only for AUTHORIZED off-lab recon under a "
+              "tight, written-authorized scope policy.", file=sys.stderr)
+        try:
+            sandbox = LocalSandbox(audit_key_env=guard.policy.audit_key_env)
+        except RuntimeError as exc:
+            print(f"REFUSED --sandbox local: {exc}", file=sys.stderr)
+            return 2
     else:
         sandbox = DockerSandbox(args.compose)
     orch = Orchestrator(guard, sandbox, per_tool_timeout=args.timeout,
