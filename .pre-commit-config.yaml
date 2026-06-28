@@ -1,0 +1,27 @@
+# Shift-left mirror of the CI gates (.github/workflows/ci.yml). Run locally with:
+#   pip install pre-commit && pre-commit install
+# CI remains the authoritative gate (pre-commit can be skipped with --no-verify).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^aegis/
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        args: ["-c", "aegis/pyproject.toml", "--severity-level", "medium",
+               "--confidence-level", "medium"]
+        files: ^aegis/aegis/

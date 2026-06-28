@@ -45,7 +45,7 @@ class HostRequest(BaseModel):
     target: str
     os: str = "linux"                    # linux | windows
     user: str = "pentest"
-    password: str = "pentest"
+    password: str = "pentest"  # noqa: S105 - lab default cred, overridden by operator
     profile: str = "host-linux"
     dry_run: bool = False                # windows dry-run when no live host
     provider: str | None = None

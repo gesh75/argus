@@ -16,6 +16,7 @@ from aegis.orchestrator import Orchestrator, ScanStep
 class _Exec:
     exit_code: int
     stdout: str
+    tool_missing: bool = False
 
 
 class _FakeSandbox:

@@ -9,8 +9,6 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
-from .ai_analyzer import Finding
-
 
 def collapse_errors(errors: list[str]) -> list[str]:
     """Collapse repeated denials across targets into one summarized line each.

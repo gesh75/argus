@@ -1,0 +1,27 @@
+# Centralized tool config for Argus (Bandit / Ruff / pytest). Consumed by CI and
+# pre-commit so local and gated checks stay identical.
+
+[tool.bandit]
+# Test fixtures intentionally contain insecure patterns; scan only shipped code.
+exclude_dirs = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# High-signal set: S = flake8-bandit (subprocess/shell rules this codebase relies on),
+# F = pyflakes, I = import sorting, B = bugbear, UP = pyupgrade. E (pycodestyle line
+# length etc.) is intentionally omitted — Bandit + these cover the security-relevant
+# ground without 36 cosmetic line-length nits.
+select = ["F", "I", "B", "UP", "S"]
+# S404 (import subprocess) is unavoidable for a tool runner; argv-only call sites are
+# individually vetted with inline `# noqa: S603`.
+ignore = ["S404"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603", "S607"]  # asserts + subprocess are expected in tests
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
