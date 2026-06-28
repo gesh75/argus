@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 # defusedxml hardens against XXE / billion-laughs — tool output is UNTRUSTED.
 try:
@@ -50,7 +50,7 @@ _PORT_HINT = {"3000": "http(dev)", "8080": "http-alt", "5000": "http(dev)",
 def _nmap_xml(text: str, target: str) -> list[Observation]:
     obs: list[Observation] = []
     try:
-        root = ET.fromstring(text)
+        root = ET.fromstring(text)  # nosec B314 ET is defusedxml (see import)  # noqa: S314
     except ParseError:
         return obs
     for host in root.findall("host"):

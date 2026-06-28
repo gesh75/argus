@@ -37,7 +37,7 @@ class Policy:
     redact_patterns: tuple[str, ...] = field(default=())
 
     @staticmethod
-    def load(path: Path | str = DEFAULT_POLICY) -> "Policy":
+    def load(path: Path | str = DEFAULT_POLICY) -> Policy:
         data = yaml.safe_load(Path(path).read_text())
         scope = data.get("scope", {})
         fw = data.get("tool_firewall", {})

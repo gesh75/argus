@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import urllib.request
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 from ..tools import Observation
 
@@ -79,17 +79,17 @@ class HttpTransport:
         self.max_body = max_body
 
     def get(self, url: str, timeout: int) -> HttpResult:
-        req = urllib.request.Request(url, method="GET",
+        req = urllib.request.Request(url, method="GET",  # noqa: S310
                                      headers={"User-Agent": "Argus-Recon/1.0"})
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 scheme validated by scope guard  # noqa: S310
                 body = resp.read(self.max_body).decode("utf-8", "replace")
                 return HttpResult(resp.status, body, resp.headers.get("Server", ""))
         except urllib.error.HTTPError as exc:  # 401/403/404 still informative
             body = b""
             try:
                 body = exc.read(self.max_body)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110 - error body is best-effort
                 pass
             return HttpResult(exc.code, body.decode("utf-8", "replace"),
                               exc.headers.get("Server", "") if exc.headers else "")

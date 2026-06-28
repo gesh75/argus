@@ -54,3 +54,21 @@ def test_localsandbox_empty_argv_does_not_crash(_which_ok):
     sb = LocalSandbox(audit_key_env="X")
     res = sb.run([], timeout=5)
     assert res.exit_code == 127
+    assert res.tool_missing is True
+
+
+def test_localsandbox_real_127_is_not_flagged_missing(_which_ok):
+    # A tool that actually runs and exits 127 must NOT be reported as "not installed".
+    sb = LocalSandbox(audit_key_env="X")
+    res = sb.run([sys.executable, "-c", "raise SystemExit(127)"], timeout=30)
+    assert res.exit_code == 127
+    assert res.tool_missing is False
+
+
+def test_localsandbox_missing_binary_sets_tool_missing(monkeypatch):
+    monkeypatch.setattr("aegis.sandbox.shutil.which",
+                        lambda b: "/usr/bin/nmap" if b in ("nmap", "fping") else None)
+    sb = LocalSandbox(audit_key_env="X")
+    res = sb.run(["definitely-not-installed", "172.30.0.10"], timeout=5)
+    assert res.exit_code == 127
+    assert res.tool_missing is True

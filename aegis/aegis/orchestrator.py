@@ -49,10 +49,12 @@ class Orchestrator:
             ex = self.sandbox.run(argv, timeout=timeout)
             self.guard.record(tool.binary, exit_code=ex.exit_code,
                               summary=self.guard.sanitize(ex.stdout[:300]))
-            # Surface a missing binary (shell exit 127 = command not found) so a tool
-            # never silently no-ops. (Don't match 'not found' in output — tools like
+            # Surface a missing binary so a tool never silently no-ops. The sandbox
+            # sets tool_missing only when the binary was never launched — a tool that
+            # ran and exited 127 is a real failure, not a missing tool, and is left to
+            # parse/observe normally. (Don't match 'not found' in output — tools like
             # snmpwalk legitimately print that for empty results.)
-            if ex.exit_code == 127:
+            if ex.tool_missing:
                 result.errors.append(f"{step.tool_key}: tool unavailable in sandbox (not installed)")
             obs = tool.parse(self.guard.sanitize(ex.stdout), step.target)
             result.observations.extend(obs)

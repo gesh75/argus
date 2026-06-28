@@ -74,7 +74,12 @@ def cmd_host(args) -> int:
     if _refuse_if_out_of_scope(guard, args.target):
         return 2
     if args.os == "windows":
-        from .host.winrm_collector import DryRunWinRM, WinHostOrchestrator, WinRMCollector, WinRMCreds
+        from .host.winrm_collector import (
+            DryRunWinRM,
+            WinHostOrchestrator,
+            WinRMCollector,
+            WinRMCreds,
+        )
         creds = WinRMCreds(user=args.user, password=args.password or "",
                            https=not args.winrm_http, verify_cert=not args.winrm_insecure)
         if args.fixture:

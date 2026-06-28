@@ -43,7 +43,7 @@ def resolve_provider(override: str | None = None) -> str:
 def list_ollama_models() -> list[str]:
     """Installed local models via GET /api/tags (empty list if Ollama is down)."""
     try:
-        with urllib.request.urlopen(f"{OLLAMA_HOST}/api/tags", timeout=3) as resp:  # noqa: S310
+        with urllib.request.urlopen(f"{OLLAMA_HOST}/api/tags", timeout=3) as resp:  # nosec B310 fixed http scheme  # noqa: S310
             data = json.loads(resp.read())
         return sorted(m.get("name", "") for m in data.get("models", []) if m.get("name"))
     except Exception:  # noqa: BLE001
@@ -184,10 +184,10 @@ def _llm_complete(system: str, user: str, model: str, *, budget=None,
                 "messages": [{"role": "system", "content": system},
                              {"role": "user", "content": user}],
             }).encode()
-            req = urllib.request.Request(
+            req = urllib.request.Request(  # noqa: S310
                 f"{OLLAMA_HOST}/api/chat", data=payload,
                 headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 (local host)
+            with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310 fixed http scheme  # noqa: S310
                 data = json.loads(resp.read())
             if budget:
                 tok = data.get("prompt_eval_count", 0) + data.get("eval_count", 0)

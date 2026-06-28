@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..tools import Observation, PROFILES
+from ..tools import PROFILES, Observation
 
 # Which follow-up profile each evidence signal suggests (read-only profiles only).
 # signal-substring -> profile key

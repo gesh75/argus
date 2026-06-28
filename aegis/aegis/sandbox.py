@@ -27,6 +27,10 @@ class ExecResult:
     stdout: str
     stderr: str
     timed_out: bool = False
+    # True only when the sandbox KNOWS the binary was never launched (missing on
+    # PATH / empty argv). A tool that actually ran and exited 127 leaves this False,
+    # so the orchestrator can stop mislabeling a real failure as "not installed".
+    tool_missing: bool = False
 
 
 def _exec_argv(argv: list[str], timeout: int,
@@ -41,10 +45,10 @@ def _exec_argv(argv: list[str], timeout: int,
     scrubbed allowlist.
     """
     try:
-        p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             text=True, env=env, start_new_session=True)  # noqa: S603 (argv, no shell)
+        p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,  # noqa: S603
+                             text=True, env=env, start_new_session=True)  # argv array, never shell=True
     except FileNotFoundError as exc:
-        return ExecResult(127, "", str(exc))
+        return ExecResult(127, "", str(exc), tool_missing=True)
     try:
         out, err = p.communicate(timeout=timeout)
         return ExecResult(p.returncode, out, err)
@@ -68,7 +72,12 @@ class DockerSandbox:
     def run(self, argv: list[str], timeout: int) -> ExecResult:
         cmd = ["docker", "compose", "-f", self.compose_file, "exec", "-T",
                self.service, *argv]
-        return _exec_argv(cmd, timeout)
+        res = _exec_argv(cmd, timeout)
+        # `docker exec` returns 127 for a missing in-container binary; we can't tell
+        # that apart from a tool that ran and exited 127, so keep the heuristic here.
+        if res.exit_code == 127 and not res.timed_out:
+            res.tool_missing = True
+        return res
 
 
 # Minimal environment for host-spawned tools. This is an ALLOWLIST, not a
@@ -110,9 +119,10 @@ class LocalSandbox:
 
     def run(self, argv: list[str], timeout: int) -> ExecResult:
         if not argv:
-            return ExecResult(127, "", "empty argv")
+            return ExecResult(127, "", "empty argv", tool_missing=True)
         if not shutil.which(argv[0]):
-            return ExecResult(127, "", f"{argv[0]}: not installed on host")
+            return ExecResult(127, "", f"{argv[0]}: not installed on host", tool_missing=True)
+        # A real run that exits 127 keeps tool_missing=False — it is NOT a missing tool.
         return _exec_argv(argv, timeout, env=self._safe_env())
 
 
