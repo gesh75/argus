@@ -33,11 +33,13 @@ least-privilege `permissions: contents: read`; no long-lived secrets.
 > *Best practice:* OpenSSF post-`tj-actions`/`reviewdog` guide — mutable tags were the root
 > cause of those 2025 supply-chain compromises. — OpenSSF Maintainers' Guide (2025).
 
-### 🔭 3. Pin dependencies + generate an SBOM
-`requirements.txt` still uses `>=` ranges. Move to a hash-pinned lockfile
-(`pip-compile --generate-hashes` or `uv lock`), emit a Syft SBOM as a CI artifact, then flip
-the `pip-audit` job from informational to **blocking**. For a security tool, reproducible
-builds are table stakes.
+### ✅ 3. Pin dependencies + generate an SBOM
+`requirements.txt` remains the human-edited input; `requirements.lock`
+(`pip-compile --generate-hashes`) is the fully hash-pinned tree CI installs with
+`pip install --require-hashes`. CI now emits a **CycloneDX SBOM** (`argus-sbom.cdx.json`)
+as an artifact, and the `pip-audit` job is **blocking** against the locked tree (currently
+0 known CVEs). Regenerate the lock after editing `requirements.txt` with
+`pip-compile --generate-hashes -o requirements.lock requirements.txt`.
 
 ---
 

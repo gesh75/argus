@@ -1,3 +1,6 @@
+# Human-edited dependency list. The hash-pinned tree CI installs is requirements.lock;
+# after editing this file, regenerate it with:
+#   pip-compile --generate-hashes -o requirements.lock requirements.txt
 # Core
 PyYAML>=6.0
 defusedxml>=0.7.1
