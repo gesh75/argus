@@ -1,7 +1,7 @@
 """Modules 4 & 5 — shadow-AI discovery and segmentation validator (offline)."""
 import os
 
-os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "test")
+os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 from aegis.recon import segmentation, shadow_ai
 from aegis.tools import Observation

@@ -9,9 +9,11 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
+from . import approval, egress, preflight
 from .config import DEFAULT_POLICY, Policy
 from .guardrail import Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
@@ -41,6 +43,16 @@ def cmd_scan(args) -> int:
         print("WARNING: --sandbox local runs tools directly on THIS host with NO "
               "network isolation. Use only for AUTHORIZED off-lab recon under a "
               "tight, written-authorized scope policy.", file=sys.stderr)
+        # Pre-flight: surface likely misconfiguration before any packet leaves (#8).
+        for w in preflight.check(args.targets, guard.policy):
+            print(f"  preflight: {w}", file=sys.stderr)
+        # Fail-closed, parameter-bound approval gate — banners don't enforce (#6).
+        try:
+            approval.verify(args.approval, "local", args.targets,
+                            os.environ.get(guard.policy.audit_key_env, ""))
+        except approval.ApprovalError as exc:
+            print(f"REFUSED --sandbox local: {exc}", file=sys.stderr)
+            return 2
         try:
             sandbox = LocalSandbox(audit_key_env=guard.policy.audit_key_env)
         except RuntimeError as exc:
@@ -180,7 +192,38 @@ def cmd_audit(args) -> int:
     guard = _guard(args)
     ok = guard.audit.verify()
     print("audit chain:", "VALID ✅" if ok else "TAMPERED ❌")
+    if guard.policy.audit_anchor_path is not None:
+        anchored, reason = guard.audit.cross_check_anchor()
+        print("anchor:", "OK ✅" if anchored else "MISMATCH ❌", "—", reason)
+        ok = ok and anchored
     return 0 if ok else 1
+
+
+def cmd_approve(args) -> int:
+    """Mint a parameter-bound approval token for a high-risk run mode (#6)."""
+    policy = Policy.load(args.policy)
+    key = os.environ.get(policy.audit_key_env)
+    if not key:
+        print(f"REFUSED: audit key env {policy.audit_key_env} unset", file=sys.stderr)
+        return 2
+    # Scope-validate every target so an out-of-scope set can never be approved.
+    guard = _guard(args)
+    for t in args.targets:
+        d = guard.check_target(t)
+        if not d.allowed:
+            print(f"REFUSED target {t}: {d.reason}", file=sys.stderr)
+            return 2
+    token = approval.mint(args.mode, args.targets, key, ttl=args.ttl)
+    print(token)
+    print(f"# authorizes `{args.mode}` against {args.targets} for {args.ttl}s",
+          file=sys.stderr)
+    return 0
+
+
+def cmd_egress(args) -> int:
+    """Print an nftables egress allow-list derived from the scope policy (#7)."""
+    sys.stdout.write(egress.nftables_ruleset(Policy.load(args.policy)))
+    return 0
 
 
 def cmd_verify(args) -> int:
@@ -212,7 +255,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--sandbox", choices=["docker", "local"], default="docker",
                    help="docker = isolated lab container (default); "
                         "local = run read-only tools on the host for AUTHORIZED off-lab "
-                        "recon (requires a tight scope policy)")
+                        "recon (requires a tight scope policy + approval token)")
+    s.add_argument("--approval", default=os.environ.get("ARGUS_APPROVAL_TOKEN"),
+                   help="approval token (REQUIRED for --sandbox local); mint with `aegis approve`")
     s.set_defaults(func=cmd_scan)
 
     h = sub.add_parser("host", help="credentialed read-only host audit (Linux/SSH or Windows/WinRM)")
@@ -273,8 +318,19 @@ def build_parser() -> argparse.ArgumentParser:
     ag.add_argument("--dry-run", action="store_true")
     ag.set_defaults(func=cmd_agent)
 
-    a = sub.add_parser("audit", help="verify the HMAC audit chain")
+    a = sub.add_parser("audit", help="verify the HMAC audit chain (+ anchor cross-check)")
     a.set_defaults(func=cmd_audit)
+
+    ap = sub.add_parser("approve",
+                        help="mint a parameter-bound approval token for --sandbox local (#6)")
+    ap.add_argument("mode", choices=["local"])
+    ap.add_argument("targets", nargs="+")
+    ap.add_argument("--ttl", type=int, default=3600, help="token lifetime in seconds (default 3600)")
+    ap.set_defaults(func=cmd_approve)
+
+    eg = sub.add_parser("egress-rules",
+                        help="print an nftables egress allow-list from the scope policy (#7)")
+    eg.set_defaults(func=cmd_egress)
 
     v = sub.add_parser("verify", help="print loaded policy")
     v.set_defaults(func=cmd_verify)

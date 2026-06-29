@@ -52,35 +52,42 @@ own guidance in code — refuse to start if the audit key path is owned by the s
 runner or has loose perms (fail-to-start, don't bypass). Longer term: a tiny out-of-band
 signer the orchestrator talks to but never holds the key for.
 
+**✅ Short-term landed:** `AuditLog` now **fails closed on a weak audit key** (`MIN_AUDIT_KEY_LEN
+= 32`) — a placeholder/short key can no longer sign a "tamper-evident" chain (`guardrail.py`).
+**🔭 Remaining:** the full out-of-band signer process (orchestrator never holds the key).
+
 > *Best practice:* "the agent never touches the signing keys" (ROE Gate, reference-monitor /
 > Anderson 1972); "the key sits outside the log volume so an attacker who can write the log
 > can't read or rotate the key" (`bernstein` audit-log operations doc).
 
-### 🔭 5. External anchoring + WORM for the audit chain
-HMAC chaining alone does not survive a key compromise. On a timer, write the latest chain
-tip to a destination the runner can't rewrite (S3 Object Lock compliance mode, or a
-KMS-signed artifact) and have the verifier cross-check it.
+### ✅ 5. External anchoring + WORM for the audit chain
+`AuditLog` mirrors the chain tip `{seq, tip, ts}` to an out-of-band **anchor file** after every
+entry (`anchor.py`); `aegis audit` **cross-checks** the live chain against it, so a full-log
+rewrite (even with a leaked key) is detectable. Enabled by setting `audit.anchor_path` in the
+policy. **🔭 Operational:** point that path at a real write-once store (S3 Object Lock compliance
+mode / KMS-signed object / WORM volume) owned by a different uid — the file format is ready.
 
 > *Best practice:* "HMAC alone does not defend against a compromised app — layer append-only
 > storage and external anchoring on top." — Tracehold; SystemsHardening audit-logging
 > architecture (CloudTrail-style log-file validation).
 
-### 🔭 6. Risk-tiered approval gate for `--sandbox local` / `--arm`
-Replace the current warning banner with a real, parameter-bound acknowledgment: bind
-approval to the exact action (actor + tool + normalized target + expiry), fail closed on
-missing approval, and forbid wildcard grants for the un-isolated local path.
+### ✅ 6. Risk-tiered approval gate for `--sandbox local`
+`--sandbox local` now requires a **parameter-bound, fail-closed approval token** (`approval.py`):
+an HMAC over `(mode, canonical-sorted-targets, expiry)` keyed by the audit key. Mint with
+`aegis approve local <targets> [--ttl N]`; pass via `--approval`/`ARGUS_APPROVAL_TOKEN`. A token
+cannot be replayed against different targets or after expiry, and wildcard grants are impossible
+(every token names its targets). The banner alone is gone — no token, no run.
 
 > *Best practice:* "system-prompt guardrails don't guard anything… agents take risky actions
 > 23.9% of the time even with explicit safety instructions" (ROE Gate); "bind approval to the
 > exact action… fail closed when approval validation fails" (OWASP AI Agent Security Cheat
 > Sheet); avoid wildcard trust grants (AWS Well-Architected, agentic-AI lens).
 
-### 🔭 7. Network-layer egress control for the local path
-`--sandbox local` now relies *solely* on the app-layer scope guard (the container boundary is
-gone). Best-of-breed pentest agents enforce scope at the **network/DNS layer** too, so a
-guardrail bug or HTTP redirect can't reach an out-of-scope host. Even a documented
-`nftables` egress-allowlist helper (matching the project's own two-node disposable-host
-guidance) adds the missing second layer.
+### ✅ 7. Network-layer egress control for the local path
+`aegis egress-rules` generates a deterministic **nftables egress allow-list** from the scope
+policy (`egress.py`): default-drop, allow only the policy's in-scope CIDRs (denied ranges carved
+out first). Apply it with `nft -f` on the disposable recon host before `--sandbox local`, so a
+guardrail bug or HTTP redirect can't reach an out-of-scope host — the packet never leaves the box.
 
 > *Best practice:* "we don't rely on prompts or humans for scope enforcement — we enforce at
 > the network layer, intercepting HTTP and DNS" (Aikido); "exclusions beat authorizations;
@@ -101,15 +108,23 @@ new tests in `tests/test_sandbox.py`.
 Added `aegis/pyproject.toml` (Bandit / Ruff / pytest config) and `.pre-commit-config.yaml`
 mirroring the CI gates for shift-left feedback.
 
-### 🔭 10. Pre-flight "is this production?" checks
-Before a `--sandbox local` run, validate reachability and surface "this resembles production"
-warnings early — "configuration mistakes are more likely than malicious behaviour." — Aikido
-pre-flight checks.
+### ✅ 10. Pre-flight "is this production?" checks
+Before a `--sandbox local` run, `preflight.check()` (`preflight.py`) surfaces warnings to stderr
+— public-IP targets on the un-isolated path, an over-broad allow-list (> a /24), `resolve_dns`
+enabled — so a human catches the misconfiguration at setup time rather than after packets fly.
+
+> *Best practice:* "catch human error before execution starts, rather than relying on runtime
+> controls to fix avoidable setup mistakes." — Aikido pre-flight checks.
 
 ---
 
-## Suggested sequencing
-`P0 (CI + pinning)` → `P1.6 approval gate + P2.8 127-fix (done)` → `P1.4/5 key isolation +
-anchoring` → `P1.7 network egress` → `P2 polish`.
+## Status
+**Done:** P0 (CI + supply-chain), P1.5/6/7, P2.8/9/10, and the P1.4 short-term key-strength gate.
+**Remaining:** P1.4 full out-of-band signer process, and the P1.5 production WORM target
+(the in-repo anchor format + cross-check are ready; pointing it at S3 Object Lock / KMS is an
+operational step).
+
+## Suggested sequencing (remaining)
+`P1.4 out-of-band signer` → wire `audit.anchor_path` to a real WORM store in production.
 
 _Tracking issues are linked from each 🔭 item once opened._
