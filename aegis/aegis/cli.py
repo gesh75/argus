@@ -37,22 +37,33 @@ def cmd_scan(args) -> int:
         if not d.allowed:
             print(f"REFUSED target {t}: {d.reason}", file=sys.stderr)
             return 2
+    # Fail-closed, parameter-bound approval gate for high-risk modes — banners don't
+    # enforce (#6). `local` = un-isolated host exec; `arm` = exploit-capable tools.
+    # Dry-run executes nothing, so it needs no approval.
+    required = []
+    if not args.dry_run:
+        if args.sandbox == "local":
+            required.append("local")
+        if getattr(args, "arm", None):
+            required.append("arm")
+    if required:
+        if "local" in required:
+            # Pre-flight: surface likely misconfiguration before any packet leaves (#8).
+            for w in preflight.check(args.targets, guard.policy):
+                print(f"  preflight: {w}", file=sys.stderr)
+        try:
+            approval.verify(args.approval, required, args.targets,
+                            os.environ.get(guard.policy.audit_key_env, ""))
+        except approval.ApprovalError as exc:
+            print(f"REFUSED [{'+'.join(sorted(set(required)))}]: {exc}", file=sys.stderr)
+            return 2
+
     if args.dry_run:
         sandbox = DryRunSandbox()
     elif args.sandbox == "local":
         print("WARNING: --sandbox local runs tools directly on THIS host with NO "
               "network isolation. Use only for AUTHORIZED off-lab recon under a "
               "tight, written-authorized scope policy.", file=sys.stderr)
-        # Pre-flight: surface likely misconfiguration before any packet leaves (#8).
-        for w in preflight.check(args.targets, guard.policy):
-            print(f"  preflight: {w}", file=sys.stderr)
-        # Fail-closed, parameter-bound approval gate — banners don't enforce (#6).
-        try:
-            approval.verify(args.approval, "local", args.targets,
-                            os.environ.get(guard.policy.audit_key_env, ""))
-        except approval.ApprovalError as exc:
-            print(f"REFUSED --sandbox local: {exc}", file=sys.stderr)
-            return 2
         try:
             sandbox = LocalSandbox(audit_key_env=guard.policy.audit_key_env)
         except RuntimeError as exc:
@@ -213,10 +224,11 @@ def cmd_approve(args) -> int:
         if not d.allowed:
             print(f"REFUSED target {t}: {d.reason}", file=sys.stderr)
             return 2
-    token = approval.mint(args.mode, args.targets, key, ttl=args.ttl)
+    modes = args.mode or ["local"]
+    token = approval.mint(modes, args.targets, key, ttl=args.ttl)
     print(token)
-    print(f"# authorizes `{args.mode}` against {args.targets} for {args.ttl}s",
-          file=sys.stderr)
+    print(f"# authorizes [{'+'.join(sorted(set(modes)))}] against {args.targets} "
+          f"for {args.ttl}s", file=sys.stderr)
     return 0
 
 
@@ -322,9 +334,10 @@ def build_parser() -> argparse.ArgumentParser:
     a.set_defaults(func=cmd_audit)
 
     ap = sub.add_parser("approve",
-                        help="mint a parameter-bound approval token for --sandbox local (#6)")
-    ap.add_argument("mode", choices=["local"])
+                        help="mint a parameter-bound approval token for --sandbox local / --arm (#6)")
     ap.add_argument("targets", nargs="+")
+    ap.add_argument("--mode", action="append", choices=["local", "arm"],
+                    help="mode(s) this token authorizes (repeatable; default: local)")
     ap.add_argument("--ttl", type=int, default=3600, help="token lifetime in seconds (default 3600)")
     ap.set_defaults(func=cmd_approve)
 

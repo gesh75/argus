@@ -71,12 +71,15 @@ mode / KMS-signed object / WORM volume) owned by a different uid — the file fo
 > storage and external anchoring on top." — Tracehold; SystemsHardening audit-logging
 > architecture (CloudTrail-style log-file validation).
 
-### ✅ 6. Risk-tiered approval gate for `--sandbox local`
-`--sandbox local` now requires a **parameter-bound, fail-closed approval token** (`approval.py`):
-an HMAC over `(mode, canonical-sorted-targets, expiry)` keyed by the audit key. Mint with
-`aegis approve local <targets> [--ttl N]`; pass via `--approval`/`ARGUS_APPROVAL_TOKEN`. A token
-cannot be replayed against different targets or after expiry, and wildcard grants are impossible
-(every token names its targets). The banner alone is gone — no token, no run.
+### ✅ 6. Risk-tiered approval gate for `--sandbox local` / `--arm`
+Both high-risk modes now require a **parameter-bound, fail-closed approval token** (`approval.py`):
+an HMAC over `(canonical-modes, canonical-sorted-targets, expiry)` keyed by the audit key.
+`--sandbox local` requires a `local`-scoped token; `--arm` (exploit-capable tools) requires an
+`arm`-scoped token in any sandbox; using both requires a token authorizing both. Mint with
+`aegis approve <targets> [--mode local] [--mode arm] [--ttl N]`; pass via
+`--approval`/`ARGUS_APPROVAL_TOKEN`. A token cannot be replayed against different targets/modes
+or after expiry, and wildcard grants are impossible (every token names its exact targets +
+modes). Dry-runs need no token (they execute nothing). The banner alone is gone — no token, no run.
 
 > *Best practice:* "system-prompt guardrails don't guard anything… agents take risky actions
 > 23.9% of the time even with explicit safety instructions" (ROE Gate); "bind approval to the

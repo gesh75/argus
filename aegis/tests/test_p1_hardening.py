@@ -38,6 +38,22 @@ def test_approval_rejects_wrong_key():
         approval.verify(tok, "local", ["172.30.0.10"], "z" * 32)
 
 
+def test_approval_combined_modes_exact_match():
+    tok = approval.mint(["local", "arm"], ["172.30.0.10"], KEY, ttl=60)
+    # order-independent within the set
+    approval.verify(tok, ["arm", "local"], ["172.30.0.10"], KEY)
+    # a {local,arm} token must NOT satisfy a {local}-only requirement (exact match, fail closed)
+    with pytest.raises(approval.ApprovalError):
+        approval.verify(tok, ["local"], ["172.30.0.10"], KEY)
+
+
+def test_approval_arm_mode_distinct_from_local():
+    tok = approval.mint("arm", ["172.30.0.10"], KEY, ttl=60)
+    approval.verify(tok, "arm", ["172.30.0.10"], KEY)
+    with pytest.raises(approval.ApprovalError):
+        approval.verify(tok, "local", ["172.30.0.10"], KEY)
+
+
 def test_approval_expired():
     tok = approval.mint("local", ["172.30.0.10"], KEY, ttl=10, now=1000)
     with pytest.raises(approval.ApprovalError, match="expired"):
