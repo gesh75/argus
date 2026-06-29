@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "test-key-0123456789")
+os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 from aegis.config import Policy  # noqa: E402
 from aegis.guardrail import Guardrail, GuardrailError, canon_network  # noqa: E402

@@ -1,7 +1,7 @@
 """End-to-end: a scan auto-enriches with shadow-AI, segmentation, cred-exposure, chains."""
 import os
 
-os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "test")
+os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 from dataclasses import dataclass
 

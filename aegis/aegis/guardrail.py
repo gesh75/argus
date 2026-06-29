@@ -94,6 +94,11 @@ def canon_network(token: str) -> ipaddress.IPv4Network:
     return ipaddress.ip_network(f"{'.'.join(octets)}/{int(prefix)}", strict=True)
 
 
+# Minimum audit-key length (#4). The documented key is `openssl rand -hex 32` (64 chars);
+# we fail closed below 32 so a weak/placeholder key can't sign a "tamper-evident" chain.
+MIN_AUDIT_KEY_LEN = 32
+
+
 class AuditLog:
     """HMAC-SHA256 chained, append-only, tamper-evident audit trail."""
 
@@ -103,23 +108,31 @@ class AuditLog:
             raise GuardrailError(
                 f"audit key env {policy.audit_key_env} unset — refusing to run unaudited"
             )
+        if len(key) < MIN_AUDIT_KEY_LEN:
+            raise GuardrailError(
+                f"audit key too short ({len(key)}<{MIN_AUDIT_KEY_LEN} chars) — a weak key "
+                f"makes the chain forgeable; generate one with `openssl rand -hex 32`"
+            )
         self._key = key.encode()
         self._path = policy.audit_path
         self._chained = policy.audit_chained
+        self._anchor_path = policy.audit_anchor_path
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._prev = self._last_hmac()
+        self._prev, self._seq = self._last_state()
 
-    def _last_hmac(self) -> str:
+    def _last_state(self) -> tuple[str, int]:
+        """Return (last_hmac, entry_count) by replaying the existing log."""
         if not self._path.exists():
-            return "genesis"
-        last = "genesis"
+            return "genesis", 0
+        last, seq = "genesis", 0
         for line in self._path.read_text().splitlines():
             if line.strip():
                 try:
                     last = json.loads(line)["hmac"]
+                    seq += 1
                 except (json.JSONDecodeError, KeyError):
                     continue
-        return last
+        return last, seq
 
     def write(self, event: dict) -> str:
         entry = {"ts": round(time.time(), 3),
@@ -131,7 +144,30 @@ class AuditLog:
         with self._path.open("a") as fh:
             fh.write(json.dumps(entry, separators=(",", ":")) + "\n")
         self._prev = mac
+        self._seq += 1
+        # Update the out-of-band anchor so the chain tip is mirrored to a WORM store (#5).
+        if self._anchor_path is not None:
+            from . import anchor
+            anchor.write_anchor(self._anchor_path, self._seq, mac, entry["ts"])
         return mac
+
+    def cross_check_anchor(self) -> tuple[bool, str]:
+        """Compare the live chain tip against the out-of-band anchor (#5).
+
+        Detects a full-log rewrite that the in-file HMAC alone cannot (an attacker with the
+        leaked key recomputes every MAC, but cannot also forge the WORM anchor).
+        """
+        if self._anchor_path is None:
+            return True, "no anchor configured"
+        from . import anchor
+        rec = anchor.read_anchor(self._anchor_path)
+        if rec is None:
+            return False, "anchor missing — chain tip was never anchored or anchor was deleted"
+        tip, seq = self._last_state()
+        if rec.get("tip") != tip or rec.get("seq") != seq:
+            return (False, f"anchor mismatch — anchor=(seq={rec.get('seq')}, "
+                    f"tip={str(rec.get('tip'))[:8]}…) chain=(seq={seq}, tip={tip[:8]}…)")
+        return True, f"anchor matches chain tip (seq={seq})"
 
     def verify(self) -> bool:
         """Replay the chain; False if any entry was altered, reordered, or removed."""

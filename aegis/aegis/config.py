@@ -35,6 +35,8 @@ class Policy:
     audit_path: Path
     audit_chained: bool
     redact_patterns: tuple[str, ...] = field(default=())
+    # Optional out-of-band anchor for the chain tip (#5). Point at a WORM/append-only path.
+    audit_anchor_path: Path | None = None
 
     @staticmethod
     def load(path: Path | str = DEFAULT_POLICY) -> Policy:
@@ -47,6 +49,11 @@ class Policy:
         audit_path = Path(aud.get("path", "aegis/output/audit.ndjson"))
         if not audit_path.is_absolute():
             audit_path = REPO_ROOT / audit_path
+        anchor_path = aud.get("anchor_path")
+        if anchor_path:
+            anchor_path = Path(anchor_path)
+            if not anchor_path.is_absolute():
+                anchor_path = REPO_ROOT / anchor_path
 
         def nets(key: str) -> tuple[ipaddress.IPv4Network, ...]:
             return tuple(
@@ -71,4 +78,5 @@ class Policy:
             audit_path=audit_path,
             audit_chained=bool(aud.get("chained", True)),
             redact_patterns=tuple(san.get("redact_patterns", [])),
+            audit_anchor_path=anchor_path or None,
         )

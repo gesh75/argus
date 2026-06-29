@@ -59,6 +59,11 @@ audit:                              # Layer 6 — tamper-evident
   # Local-dev default (project-relative). For production, point at an OS-append-only
   # (chattr +a / WORM) path owned by a different uid than the tool runner.
   path: aegis/output/audit.ndjson
+  # Optional out-of-band anchor (#5): the chain tip {seq, tip, ts} is mirrored here after
+  # every entry. Point at a write-once store (S3 Object Lock / KMS object / WORM volume)
+  # the tool runner cannot rewrite; `aegis audit` cross-checks the live chain against it,
+  # so a full-log rewrite is detectable even if the HMAC key leaks. Off by default.
+  # anchor_path: /mnt/worm/argus/audit-anchor.json
 
 output_sanitizer:                   # Layer 7
   redact_patterns:

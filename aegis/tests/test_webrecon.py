@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "test")
+os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 from aegis.recon.web import (FixtureTransport, HttpResult, WebReconOrchestrator,
                              probe)
