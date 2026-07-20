@@ -7,11 +7,13 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
-from .evidence import EvidenceGraph, Observation
+from .evidence import EvidenceGraph
 from .guardrail import Guardrail
 from .agents.base import BaseAgent
+from .persistence import save_graph, load_graph
 
 
 @dataclass
@@ -27,27 +29,36 @@ class DeltaReport:
 class ContinuousRunner:
     """Orchestrates repeated authorized runs and delta computation."""
 
-    def __init__(self, guardrail: Guardrail, agents: list[BaseAgent], graph: EvidenceGraph):
+    def __init__(
+        self,
+        guardrail: Guardrail,
+        agents: list[BaseAgent],
+        graph: EvidenceGraph | None = None,
+        persist_path: Path | None = None,
+    ):
         self.guardrail = guardrail
         self.agents = agents
-        self.graph = graph
-        self.previous_nodes: set[str] = set()
+        self.persist_path = persist_path or Path("data/evidence_graph.json")
+        self.graph = graph or load_graph(self.persist_path)
+        self.previous_nodes: set[str] = set(self.graph.g.nodes)
 
     def one_cycle(self) -> DeltaReport:
         before = set(self.graph.g.nodes)
         for agent in self.agents:
             proposals = agent.propose()
             for prop in proposals:
-                # Every proposal is still forced through the Guardrail
                 tool = prop.get("tool")
                 args = prop.get("args", [])
                 targets = prop.get("targets", [])
                 if tool and targets:
                     try:
                         agent.run_authorized(tool, args, targets)
-                    except Exception as exc:  # GuardrailError or other
-                        # Logged by Guardrail; continue safely
-                        pass
+                    except Exception:
+                        pass  # Guardrail already logged the denial
+        # Run correlation if present
+        for agent in self.agents:
+            if hasattr(agent, "derive_paths"):
+                agent.derive_paths()
         after = set(self.graph.g.nodes)
         new = after - before
         report = DeltaReport(
@@ -58,6 +69,7 @@ class ContinuousRunner:
             summary=f"{len(new)} new nodes this cycle",
         )
         self.previous_nodes = after
+        save_graph(self.graph, self.persist_path)
         return report
 
     def run_loop(self, interval_seconds: int = 3600, max_runs: int = 0) -> None:
