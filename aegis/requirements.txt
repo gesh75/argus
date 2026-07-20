@@ -11,5 +11,7 @@ pywinrm>=0.4.3
 # Web GUI
 fastapi>=0.110
 uvicorn[standard]>=0.29
+# Evidence Graph (V2)
+networkx>=3.0
 # Dev/test
 pytest>=8.0
