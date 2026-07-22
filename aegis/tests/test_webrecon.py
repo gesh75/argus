@@ -1,18 +1,140 @@
 """Module 1 — Web/API recon tests (offline, fixture transport)."""
+import contextlib
+import http.server
 import os
+import socket
+import threading
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
 os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
-from aegis.recon.web import (FixtureTransport, HttpResult, WebReconOrchestrator,
-                             probe)
 from aegis.config import DEFAULT_POLICY, Policy
 from aegis.guardrail import Guardrail
+from aegis.recon.web import (
+    FixtureTransport,
+    HttpResult,
+    HttpTransport,
+    SandboxTransport,
+    WebReconOrchestrator,
+    probe,
+)
 
 
 def _guard():
     return Guardrail(Policy.load(DEFAULT_POLICY))
+
+
+class _RedirectHandler(http.server.BaseHTTPRequestHandler):
+    location = "/sink"
+    status = 302
+    requests: list[str] = []
+
+    def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
+        type(self).requests.append(self.path)
+        if self.path == "/start":
+            self.send_response(type(self).status)
+            self.send_header("Location", type(self).location)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"followed")
+
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        return
+
+
+@contextlib.contextmanager
+def _redirect_server(status: int, location: str) -> Iterator[tuple[str, type[_RedirectHandler]]]:
+    handler = type(
+        "RedirectHandler",
+        (_RedirectHandler,),
+        {"status": status, "location": location, "requests": []},
+    )
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        yield f"http://{host}:{port}/start", handler
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_http_transport_refuses_every_redirect_status(status: int) -> None:
+    with _redirect_server(status, "/sink") as (url, handler):
+        result = HttpTransport().get(url, timeout=2)
+
+    assert result.status == status
+    assert result.location == "/sink"
+    assert handler.requests == ["/start"]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "/relative",
+        "http://127.0.0.1:9/loopback",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://8.8.8.8/public",
+        "http://10.0.0.1/denied",
+        "http://example.invalid/hostname",
+        "http://[::ffff:127.0.0.1]:9/mapped",
+    ],
+    ids=["relative", "loopback", "link-local", "public", "denied", "hostname", "mapped"],
+)
+def test_redirect_destination_transport_is_never_invoked(
+    monkeypatch: pytest.MonkeyPatch, location: str
+) -> None:
+    real_create_connection = socket.create_connection
+    attempted_destinations: list[tuple[str, int]] = []
+
+    with _redirect_server(302, location) as (url, handler):
+        source_port = int(url.split(":")[2].split("/")[0])
+
+        def guarded_connection(
+            address: tuple[str, int], timeout: float | object = socket._GLOBAL_DEFAULT_TIMEOUT,
+            source_address: tuple[str, int] | None = None,
+        ) -> socket.socket:
+            host, port = address
+            if host == "127.0.0.1" and port == source_port:
+                return real_create_connection(address, timeout, source_address)
+            attempted_destinations.append(address)
+            raise AssertionError(f"redirect transport invoked for {address}")
+
+        monkeypatch.setattr(socket, "create_connection", guarded_connection)
+        result = HttpTransport().get(url, timeout=2)
+
+    assert result.status == 302
+    assert result.location == location
+    assert handler.requests == ["/start"]
+    assert attempted_destinations == []
+
+
+class _RecordingSandbox:
+    def __init__(self) -> None:
+        self.argv: list[str] = []
+
+    def run(self, argv: list[str], timeout: int):
+        self.argv = argv
+        return type("Exec", (), {"stdout": "HTTP/1.1 302 Found\r\nLocation: /next\r\n\r\n"})()
+
+
+def test_sandbox_transport_explicitly_disables_redirects() -> None:
+    sandbox = _RecordingSandbox()
+
+    result = SandboxTransport(sandbox).get("http://127.0.0.1/start", timeout=2)
+
+    assert result.status == 302
+    assert "-L" not in sandbox.argv
+    assert "--location" not in sandbox.argv
+    assert sandbox.argv[sandbox.argv.index("--max-redirs") + 1] == "0"
 
 
 def test_env_file_exposure_detected():

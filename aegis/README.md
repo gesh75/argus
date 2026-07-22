@@ -4,14 +4,16 @@
 
 > **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
 
-![tests](https://img.shields.io/badge/tests-72%20passing-brightgreen)
-![python](https://img.shields.io/badge/python-3.14-3776ab)
+![tests](https://img.shields.io/badge/tests-139%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.12-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
 ![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
 ![scope](https://img.shields.io/badge/scope-network%20%C2%B7%20host%20%C2%B7%20AD%20%C2%B7%20web-1f6feb)
 
-Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus is built the other way around** — every action flows through a 7-layer fail-closed guardrail first, an agent loop decides what to run next from the evidence it has, and a deterministic engine chains findings into multi-step attack paths. The result is safe enough to run near regulated systems and smart enough to find what a checklist misses.
+Argus V1 is an alpha, supervised security-assessment pipeline built around deterministic authorization and sandboxed collectors. V2 agent, continuous, and evidence-graph modules are experimental scaffolding, not a production continuous service.
+
+> **Deployment boundary:** the web console is localhost-only, ignores proxy identity headers, and defaults to server-enforced dry-run. Host and AD web execution are denied unless live mode is enabled in server startup configuration. Do not expose it as a network or multi-user service.
 
 ---
 
@@ -127,14 +129,14 @@ REFUSED target 167772165: scope: 10.0.0.5/32 outside allowed scope
 
 ## Security posture
 
-> **Read-only everywhere** except a hard-gated PoC verifier. Credentialed checks use null/guest/audit accounts. WinRM defaults to HTTPS + cert validation; SSH key-auth preferred. Credentials are **never** logged — the audit records only the check + target; secrets and sensitive data are redacted from all output. The PoC runner refuses unless **all three** gates pass: armed (`--arm poc`) **and** target inside `AEGIS_LAB_NET` **and** `AEGIS_POC_CONFIRM_ISOLATED=1`. Before any live use: written authorization + CIDR scope + exclusions for regulated systems. See [`SECURITY.md`](SECURITY.md).
+> **Default posture:** V1 is sandbox-first and dry-run capable, but explicitly selected profiles and PoC paths can emit traffic or execute remote checks. Use only with written authorization, exact scope, separately verified isolation, and non-production credentials. See [`SECURITY.md`](SECURITY.md).
 
 ## Tests
 
-72 passing — guardrail (21), agent/chains/planner/PoC (15), Windows+AD (8), web recon (8), recon modules (8), Linux host (6), heuristics (4), end-to-end integration (2).
+Current Phase 1 collection: **139 tests** on Python 3.12. Older totals in `BUILD_AND_TEST_LOG.md` are retained as labeled historical snapshots.
 
 ```bash
-PENTEST_AUDIT_HMAC_KEY=test python -m pytest -q
+PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
 ```
 
 ## Docs

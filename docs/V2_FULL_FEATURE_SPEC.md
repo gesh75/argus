@@ -1,5 +1,9 @@
 # Argus V2 Full Feature Specification
 
+> **Status: target specification, partially scaffolded.** Sections labeled as implemented may
+> describe reusable V1 controls or incomplete V2 modules; they do not establish an integrated,
+> production-ready continuous service.
+
 **Best-in-class free AI defensive intelligence tool — Continuous Self-Defense Sensor for the gesh75 Network AI Defender Fabric.**
 
 ## Core Philosophy

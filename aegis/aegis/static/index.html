@@ -97,8 +97,8 @@
       <label style="margin-top:12px">AI analysis</label>
       <select id="provider"></select>
       <select id="omodel" style="margin-top:6px;display:none"></select>
-      <div class="row"><input type="checkbox" id="dry" checked style="width:auto">
-        <label style="margin:0" id="drylabel">Dry-run (policy test, no execution)</label></div>
+      <div class="row"><input type="checkbox" id="dry" checked disabled style="width:auto">
+        <label style="margin:0" id="drylabel">Server-enforced dry-run</label></div>
       <div class="row" style="margin-top:14px"><button id="run">▶ Run scan</button></div>
       <div class="row"><button class="sec" id="loadpol">Reload</button></div>
     </div>
@@ -116,105 +116,257 @@
   </div>
 </main>
 <script>
-const $=s=>document.querySelector(s);
+const $=selector=>document.querySelector(selector);
+const safeText=(value,fallback='')=>value===undefined||value===null?fallback:String(value);
+const safeArray=value=>Array.isArray(value)?value:[];
+const node=(tag,text='',className='')=>{
+  const element=document.createElement(tag);
+  if(className) element.className=className;
+  element.textContent=safeText(text);
+  return element;
+};
+const heading=text=>node('h2',text);
+const SEVERITY_ORDER=Object.freeze({Critical:4,High:3,Medium:2,Low:1,Info:0});
+function severityInfo(value){
+  const label=Object.hasOwn(SEVERITY_ORDER,value)?value:'Info';
+  return {label,className:label,rank:SEVERITY_ORDER[label]};
+}
+function severityBadge(value){
+  const info=severityInfo(value);
+  const badge=node('span',info.label);
+  badge.classList.add('sev',info.className);
+  return badge;
+}
+function appendOption(select,value,label){
+  const option=document.createElement('option');
+  option.value=safeText(value);
+  option.textContent=safeText(label);
+  select.appendChild(option);
+}
+function makeKpi(value,label,className){
+  const card=document.createElement('div');
+  card.classList.add('kpi',className);
+  card.append(node('b',value),node('span',label));
+  return card;
+}
 let PROFILES={};
+let LIVE_ENABLED=false;
 async function loadPolicy(){
   const p=await (await fetch('/api/policy')).json();
-  PROFILES=p.profiles||{};
-  $('#scope').textContent='scope: '+p.allowed.join(', ');
-  $('#polbox').innerHTML=`default: <code>${p.tool_default}</code> · ${p.tool_count} tools<br>budget: $${p.budget.usd} / ${p.budget.wall_s}s`;
-  const ps=$('#profile'); ps.innerHTML='';
-  Object.keys(PROFILES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k+' ('+PROFILES[k].length+')';ps.appendChild(o);});
-  ps.onchange=()=>{$('#profhint').textContent=(PROFILES[ps.value]||[]).join(', ');};
-  ps.onchange();
+  PROFILES=p.profiles&&typeof p.profiles==='object'?p.profiles:{};
+  LIVE_ENABLED=p.live_enabled===true;
+  $('#scope').textContent='scope: '+safeArray(p.allowed).map(value=>safeText(value)).join(', ');
+  const polbox=$('#polbox');
+  const code=node('code',p.tool_default);
+  polbox.replaceChildren(
+    document.createTextNode('default: '),code,
+    document.createTextNode(' · '+safeText(p.tool_count)+' tools'),document.createElement('br'),
+    document.createTextNode('budget: $'+safeText(p.budget&&p.budget.usd)+' / '+
+      safeText(p.budget&&p.budget.wall_s)+'s'),document.createElement('br'),
+    document.createTextNode(LIVE_ENABLED?'server live mode: enabled':'server live mode: disabled')
+  );
+  const profiles=$('#profile');
+  profiles.replaceChildren();
+  Object.keys(PROFILES).forEach(key=>appendOption(
+    profiles,key,key+' ('+safeArray(PROFILES[key]).length+')'
+  ));
+  profiles.onchange=()=>{
+    $('#profhint').textContent=safeArray(PROFILES[profiles.value]).map(value=>safeText(value)).join(', ');
+  };
+  profiles.onchange();
   await loadModels();
+  onType();
 }
 async function loadModels(){
-  const m=await (await fetch('/api/models')).json();
-  const pv=$('#provider'); pv.innerHTML='';
-  const opts=[];
-  if(m.anthropic) opts.push(['anthropic','Claude (Haiku→Sonnet)']);
-  if(m.ollama) opts.push(['ollama','Local (Ollama)']);
-  opts.push(['heuristic','Offline heuristic']);
-  opts.forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l+(v===m.active?' · active':'');pv.appendChild(o);});
-  pv.value=m.active;
-  const om=$('#omodel'); om.innerHTML='';
-  (m.ollama_models||[]).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;om.appendChild(o);});
-  const sync=()=>{om.style.display=(pv.value==='ollama'&&om.options.length)?'block':'none';};
-  pv.onchange=sync; sync();
+  const models=await (await fetch('/api/models')).json();
+  const provider=$('#provider');
+  provider.replaceChildren();
+  const options=[];
+  if(models.anthropic) options.push(['anthropic','Claude (Haiku→Sonnet)']);
+  if(models.ollama) options.push(['ollama','Local (Ollama)']);
+  options.push(['heuristic','Offline heuristic']);
+  options.forEach(([value,label])=>appendOption(
+    provider,value,label+(value===models.active?' · active':'')
+  ));
+  provider.value=safeText(models.active,'heuristic');
+  const ollama=$('#omodel');
+  ollama.replaceChildren();
+  safeArray(models.ollama_models).forEach(model=>appendOption(ollama,model,model));
+  const sync=()=>{
+    ollama.style.display=(provider.value==='ollama'&&ollama.options.length)?'block':'none';
+  };
+  provider.onchange=sync;
+  sync();
 }
-function kpi(n,l,a){return `<div class="kpi ${a||''}"><b>${n}</b><span>${l}</span></div>`}
 const STATIC_PROFILES={'host-linux':['host-linux','host-linux-quick'],
   'host-windows':['host-windows','host-windows-quick'],'ad':[]};
 function onType(){
-  const t=$('#scantype').value;
-  $('#credblock').style.display=(t==='host-linux'||t==='host-windows')?'block':'none';
-  $('#adblock').style.display=(t==='ad')?'block':'none';
-  $('#tgtlabel').textContent=(t==='network')?'Targets (one per line — lab subnet only)':'Target (single host)';
-  const dl=$('#drylabel'), dr=$('#dry').parentElement;
-  if(t==='host-windows'){ dl.textContent='Use vulnerable-Windows fixture (no live host)'; $('#dry').checked=true; dr.style.display='flex'; }
-  else if(t==='network'){ dl.textContent='Dry-run (policy test, no execution)'; dr.style.display='flex'; }
-  else { dr.style.display='none'; }   // host-linux / ad always execute
-  const lbl=$('#proflabel').parentElement, ps=$('#profile');
-  if(t==='ad'){ ps.style.display='none'; lbl.style.display='none'; $('#profhint').textContent=''; return; }
-  ps.style.display='block'; lbl.style.display='block';
-  const keys=(t==='network')?Object.keys(PROFILES):STATIC_PROFILES[t];
-  ps.innerHTML=''; keys.forEach(k=>{const o=document.createElement('option');o.value=k;
-    o.textContent=k+(PROFILES[k]?' ('+PROFILES[k].length+')':'');ps.appendChild(o);});
-  ps.onchange=()=>{$('#profhint').textContent=(PROFILES[ps.value]||[]).join(', ');}; ps.onchange();
+  const type=$('#scantype').value;
+  const hostType=type==='host-linux'||type==='host-windows';
+  $('#credblock').style.display=hostType?'block':'none';
+  $('#adblock').style.display=type==='ad'?'block':'none';
+  $('#tgtlabel').textContent=type==='network'?
+    'Targets (one per line — lab subnet only)':'Target (single host)';
+  $('#drylabel').textContent=LIVE_ENABLED?'Server live mode enabled':'Server-enforced dry-run';
+  const liveOnly=type!=='network';
+  $('#run').disabled=liveOnly&&!LIVE_ENABLED;
+  const profileLabel=$('#proflabel').parentElement;
+  const profiles=$('#profile');
+  if(type==='ad'){
+    profiles.style.display='none';
+    profileLabel.style.display='none';
+    $('#profhint').textContent='';
+    return;
+  }
+  profiles.style.display='block';
+  profileLabel.style.display='block';
+  const keys=type==='network'?Object.keys(PROFILES):safeArray(STATIC_PROFILES[type]);
+  profiles.replaceChildren();
+  keys.forEach(key=>appendOption(
+    profiles,key,key+(PROFILES[key]?' ('+safeArray(PROFILES[key]).length+')':'')
+  ));
+  profiles.onchange=()=>{
+    $('#profhint').textContent=safeArray(PROFILES[profiles.value]).map(value=>safeText(value)).join(', ');
+  };
+  profiles.onchange();
+}
+function appendFindingTable(parent,findings){
+  parent.appendChild(heading('Findings'));
+  const table=document.createElement('table');
+  const header=document.createElement('tr');
+  ['Sev','Title','Asset','CVSS','MITRE','Conf'].forEach(label=>header.appendChild(node('th',label)));
+  table.appendChild(header);
+  findings.forEach(finding=>{
+    const row=document.createElement('tr');
+    const severity=document.createElement('td');
+    severity.appendChild(severityBadge(finding.severity));
+    const title=node('td',finding.title);
+    const asset=document.createElement('td');
+    asset.appendChild(node('code',safeText(finding.affected_asset,'?')));
+    const cvss=node('td',finding.cvss31_vector,'muted');
+    cvss.style.fontSize='11px';
+    row.append(
+      severity,title,asset,cvss,node('td',finding.mitre_attack,'muted'),
+      node('td',finding.confidence,'muted')
+    );
+    table.appendChild(row);
+  });
+  parent.appendChild(table);
+}
+function appendRemediations(parent,findings){
+  if(!findings.length) return;
+  parent.appendChild(heading('Remediation playbook (step-by-step)'));
+  findings.forEach(finding=>{
+    const card=document.createElement('div');
+    card.className='path';
+    card.style.borderLeftColor='var(--ok)';
+    const title=document.createElement('b');
+    title.append(severityBadge(finding.severity),document.createTextNode(' '+safeText(finding.title)));
+    card.appendChild(title);
+    const metadata=[finding.affected_asset,finding.platform,finding.mitre_attack]
+      .filter(Boolean).map(value=>safeText(value)).join(' · ');
+    if(metadata){
+      const meta=node('div',metadata,'muted');
+      meta.style.fontSize='11px';
+      meta.style.margin='4px 0';
+      card.appendChild(meta);
+    }
+    const supplied=safeArray(finding.mitigation_steps);
+    const steps=supplied.length?supplied:[finding.remediation||'Review and remediate.'];
+    const list=document.createElement('ol');
+    list.style.margin='6px 0 0 18px';
+    list.style.padding='0';
+    steps.forEach(step=>list.appendChild(node('li',safeText(step).replace(/^\d+\.\s*/,''))));
+    card.appendChild(list);
+    parent.appendChild(card);
+  });
+}
+function renderResult(result){
+  const output=$('#out');
+  const kpis=$('#kpis');
+  if(result&&result.error){
+    output.replaceChildren(node('span','⛔ '+safeText(result.error),'err'));
+    kpis.replaceChildren();
+    return;
+  }
+  const findings=safeArray(result&&result.findings)
+    .filter(value=>value&&typeof value==='object').slice();
+  findings.sort((left,right)=>severityInfo(right.severity).rank-severityInfo(left.severity).rank);
+  const countSeverity=label=>findings.filter(finding=>severityInfo(finding.severity).label===label).length;
+  kpis.replaceChildren(
+    makeKpi(findings.length,'findings','k-blue'),
+    makeKpi(countSeverity('Critical')+countSeverity('High'),'high/crit','k-red'),
+    makeKpi('$'+safeText(result&&result.usd),'AI cost','k-amber'),
+    makeKpi(safeText(result&&result.mode),'mode','k-green'),
+    makeKpi(result&&result.audit_valid?'✓':'✗','audit chain','k-blue')
+  );
+  output.replaceChildren();
+  const correlation=result&&result.correlation&&typeof result.correlation==='object'?
+    result.correlation:{};
+  if(correlation.executive_summary){
+    output.append(heading('Executive summary'),node('p',correlation.executive_summary));
+  }
+  safeArray(correlation.attack_paths).forEach(path=>{
+    if(!path||typeof path!=='object') return;
+    const card=document.createElement('div');
+    card.className='path';
+    card.appendChild(node(
+      'b',safeText(path.name)+' — '+severityInfo(path.severity).label
+    ));
+    const list=document.createElement('ul');
+    safeArray(path.steps).forEach(step=>list.appendChild(node('li',step)));
+    card.append(list,node('span',path.business_risk,'muted'));
+    output.appendChild(card);
+  });
+  const phi=safeArray(correlation.phi_exposure);
+  if(phi.length){
+    output.append(heading('PHI / HIPAA exposure'),node('p',phi.map(value=>safeText(value)).join(', '),'muted'));
+  }
+  appendFindingTable(output,findings);
+  appendRemediations(output,findings);
+  const errors=safeArray(result&&result.errors);
+  if(errors.length){
+    output.appendChild(heading('Guardrail denials / errors'));
+    errors.forEach(error=>output.appendChild(node('div','⛔ '+safeText(error),'muted')));
+  }
 }
 async function run(){
-  const btn=$('#run'); btn.disabled=true; btn.textContent='Scanning…';
+  const button=$('#run');
+  button.disabled=true;
+  button.textContent='Scanning…';
   const type=$('#scantype').value;
-  const targets=$('#targets').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  const prov=$('#provider').value;
-  const omodel=(prov==='ollama'&&$('#omodel').value)?$('#omodel').value:null;
-  let url,body;
-  if(type==='network'){ url='/api/scan';
-    body={targets,dry_run:$('#dry').checked,profile:$('#profile').value,provider:prov}; }
-  else if(type==='ad'){ url='/api/ad';
-    body={target:targets[0],base:$('#adbase').value,provider:prov}; }
-  else { url='/api/host';
-    body={target:targets[0],os:(type==='host-windows'?'windows':'linux'),
-          user:$('#huser').value,password:$('#hpass').value,profile:$('#profile').value,
-          dry_run:(type==='host-windows'&&$('#dry').checked),provider:prov}; }
-  if(omodel) body.ollama_model=omodel;
-  let r;
-  try{ r=await (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify(body)})).json(); }
-  catch(e){ $('#out').innerHTML='<span class="err">request failed</span>'; btn.disabled=false; btn.textContent='▶ Run scan'; return; }
-  btn.disabled=false; btn.textContent='▶ Run scan';
-  if(r.error){ $('#out').innerHTML=`<span class="err">⛔ ${r.error}</span>`; $('#kpis').innerHTML=''; return; }
-  const F=r.findings||[], sev=s=>F.filter(f=>f.severity===s).length;
-  $('#kpis').innerHTML=[kpi(F.length,'findings','k-blue'),
-    kpi(sev('Critical')+sev('High'),'high/crit','k-red'),
-    kpi('$'+r.usd,'AI cost','k-amber'),kpi(r.mode,'mode','k-green'),
-    kpi(r.audit_valid?'✓':'✗','audit chain','k-blue')].join('');
-  let h='';
-  const c=r.correlation||{};
-  if(c.executive_summary){h+=`<h2>Executive summary</h2><p>${c.executive_summary}</p>`;}
-  (c.attack_paths||[]).forEach(p=>{h+=`<div class="path"><b>${p.name} — ${p.severity}</b><ul>${(p.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ul><span class="muted">${p.business_risk||''}</span></div>`;});
-  if((c.phi_exposure||[]).length){h+=`<h2>PHI / HIPAA exposure</h2><p class="muted">${c.phi_exposure.join(', ')}</p>`;}
-  h+='<h2>Findings</h2><table><tr><th>Sev</th><th>Title</th><th>Asset</th><th>CVSS</th><th>MITRE</th><th>Conf</th></tr>';
-  F.sort((a,b)=>({Critical:4,High:3,Medium:2,Low:1,Info:0}[b.severity]-{Critical:4,High:3,Medium:2,Low:1,Info:0}[a.severity]));
-  F.forEach(f=>{h+=`<tr><td><span class="sev ${f.severity}">${f.severity}</span></td><td>${f.title}</td><td><code>${f.affected_asset||'?'}</code></td><td class="muted" style="font-size:11px">${f.cvss31_vector}</td><td class="muted">${f.mitre_attack}</td><td class="muted">${f.confidence}</td></tr>`;});
-  h+='</table>';
-  if(F.length){
-    h+='<h2>Remediation playbook (step-by-step)</h2>';
-    F.forEach(f=>{
-      const steps=(f.mitigation_steps&&f.mitigation_steps.length)?f.mitigation_steps:[f.remediation||'Review and remediate.'];
-      h+=`<div class="path" style="border-left-color:var(--ok)"><b><span class="sev ${f.severity}">${f.severity}</span> ${f.title}</b>`;
-      const meta=[f.affected_asset,f.platform,f.mitre_attack].filter(Boolean).join(' · ');
-      if(meta) h+=`<div class="muted" style="font-size:11px;margin:4px 0">${meta}</div>`;
-      h+='<ol style="margin:6px 0 0 18px;padding:0">'+steps.map(s=>`<li>${s.replace(/^\d+\.\s*/,'')}</li>`).join('')+'</ol></div>';
-    });
+  const targets=$('#targets').value.split('\n').map(value=>value.trim()).filter(Boolean);
+  const provider=$('#provider').value;
+  const ollamaModel=provider==='ollama'&&$('#omodel').value?$('#omodel').value:null;
+  let url;
+  let body;
+  if(type==='network'){
+    url='/api/scan';
+    body={targets,profile:$('#profile').value,provider};
+  }else if(type==='ad'){
+    url='/api/ad';
+    body={target:targets[0],base:$('#adbase').value,provider};
+  }else{
+    url='/api/host';
+    body={target:targets[0],os:type==='host-windows'?'windows':'linux',
+      user:$('#huser').value,password:$('#hpass').value,profile:$('#profile').value,provider};
   }
-  if((r.errors||[]).length){h+='<h2>Guardrail denials / errors</h2>'+r.errors.map(e=>`<div class="muted">⛔ ${e}</div>`).join('');}
-  $('#out').innerHTML=h;
+  if(ollamaModel) body.ollama_model=ollamaModel;
+  try{
+    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    renderResult(await response.json());
+  }catch(error){
+    $('#out').replaceChildren(node('span','request failed','err'));
+  }
+  button.textContent='▶ Run scan';
+  onType();
 }
-$('#run').onclick=run; $('#loadpol').onclick=loadPolicy;
+window.ArgusUI=Object.freeze({renderResult,severityInfo});
+$('#run').onclick=run;
+$('#loadpol').onclick=loadPolicy;
 $('#scantype').onchange=onType;
-loadPolicy().then(onType);
+loadPolicy();
 </script>
 </body>
 </html>

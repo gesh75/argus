@@ -1,5 +1,9 @@
 # Argus V2 Safety Contract (Inviolable)
 
+> **Status: target contract for experimental V2 scaffolding.** Current V1/Phase 1 behavior
+> does not yet enforce every invariant in this document. This is not a production or 24/7
+> deployment claim.
+
 This document is the binding safety contract for the Continuous Self-Defense Sensor.
 
 ## Core Invariant

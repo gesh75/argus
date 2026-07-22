@@ -1,5 +1,8 @@
 # Phased Implementation Plan — Argus Defender Fabric V2
 
+> **Status: roadmap.** Checked items may be scaffolding or documentation only. The continuous
+> V2 service is not production-ready and is not approved for unattended or 24/7 operation.
+
 ## Phase 0 — Foundation (this branch)
 - [x] Create branch `feature/argus-defender-fabric-v2`
 - [x] EvidenceGraph core scaffold

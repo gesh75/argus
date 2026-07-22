@@ -4,6 +4,7 @@
 # Core
 PyYAML>=6.0
 defusedxml>=0.7.1
+networkx>=3.2,<4
 # AI analysis (optional at runtime — pipeline falls back to heuristics without a key)
 anthropic>=0.40.0
 # Host audit (Windows/WinRM). Linux uses SSH via the sandbox; AD uses ldapsearch.

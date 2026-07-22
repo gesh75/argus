@@ -1,9 +1,14 @@
 # Argus V2 Roadmap Status — Best-in-Class Free AI Defensive Intelligence Tool
 
+> **Status: roadmap and scaffold inventory, not production behavior.** “Complete” below means
+> the scoped scaffold or document exists; it does not mean the V2 continuous service is
+> integrated, operationally durable, or safe for production/regulated/24/7 deployment.
+
 **Last updated:** 2026-07-20
 
 ## Goal
-Become the best free, open-source continuous self-defense sensor that is safe enough to run 24/7 against production and regulated networks.
+Long-term target: become a free, open-source continuous self-defense sensor with the controls
+required for separately authorized production and regulated-network evaluation.
 
 ## Phase Status
 

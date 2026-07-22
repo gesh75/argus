@@ -1,12 +1,16 @@
 # Argus V2 — Continuous Self-Defense Sensor Fabric
 
+> **Status: experimental architecture/scaffolding.** This document describes the V2 target
+> state, not current production behavior. Argus is not approved for unattended, production,
+> regulated, or 24/7 operation.
+
 **Status:** Implementation started on branch `feature/argus-defender-fabric-v2`  
 **Principle (inviolable):** The agent proposes. The Guardrail disposes.
 
 ## Elevated Purpose
 
-Argus is no longer “an agentic pentester”.  
-It is the **Continuous Authorized Self-Defense Sensor** of the gesh75 Network AI Defender Fabric — the one component safe enough to leave running against production and near-production networks.
+The target architecture is a **Continuous Authorized Self-Defense Sensor** for the gesh75
+Network AI Defender Fabric. That target has not yet been achieved.
 
 ## High-Level Architecture
 

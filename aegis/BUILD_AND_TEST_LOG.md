@@ -1,9 +1,14 @@
 # Argus — Build & Test Log
 
-Complete record of what was built and how it was validated. Companion to `README.md`
+Historical record of what was built and how it was validated. Companion to `README.md`
 (usage), `SECURITY.md` (posture), and the animated `/architecture` page (overview).
 
-**Status:** ✅ 39/39 tests passing · all modules validated live in the sandbox lab.
+> Historical snapshots below preserve the results reported at the time; their exact commit was
+> not recorded. They are not current Phase 1 verification. Current collection: **139 tests** on
+> Python 3.12. Current command:
+> `PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q`.
+
+**Historical status:** 39/39 tests were reported passing, with modules exercised in the sandbox lab.
 **Stack:** Python 3.14 · FastAPI · Docker (Apple Silicon, native arm64) · Anthropic SDK / Ollama.
 
 ---
@@ -73,9 +78,10 @@ All on an `internal: true` Docker network → **no route to host LAN or internet
 
 ---
 
-## 5. Test suite — 39 tests, all passing
+## 5. Historical test snapshot — 39 tests reported passing
 
-Run: `PENTEST_AUDIT_HMAC_KEY=test python -m pytest -q`
+The original command used an audit key that is now invalid under the enforced 32-character floor.
+Use the current command at the top of this document.
 
 ### `test_guardrail.py` (21) — scope, firewall, audit
 IP canonicalization (decimal/hex/octal), out-of-scope + decimal-obfuscated denial, broad-CIDR
