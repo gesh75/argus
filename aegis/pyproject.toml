@@ -1,6 +1,35 @@
 # Centralized tool config for Argus (Bandit / Ruff / pytest). Consumed by CI and
 # pre-commit so local and gated checks stay identical.
 
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argus-security"
+version = "0.1.0"
+description = "Authorized internal AI-driven security assessment orchestrator"
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6.0",
+    "defusedxml>=0.7.1",
+    "networkx>=3.2,<4",
+    "anthropic>=0.40.0",
+    "pywinrm>=0.4.3",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.scripts]
+argus = "aegis.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aegis*"]
+
+[tool.setuptools.package-data]
+aegis = ["static/*.html"]
+
 [tool.bandit]
 # Test fixtures intentionally contain insecure patterns; scan only shipped code.
 exclude_dirs = ["tests"]
