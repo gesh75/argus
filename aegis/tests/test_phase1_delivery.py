@@ -27,7 +27,7 @@ def test_networkx_is_hash_locked() -> None:
 
 
 def test_no_active_documentation_uses_the_invalid_short_audit_key() -> None:
-    weak_command = "PENTEST_AUDIT_HMAC_KEY=test"
+    weak_command = "PENTEST_AUDIT_HMAC_KEY=" + "test"
     active_files = [
         REPO_ROOT / "README.md",
         AEGIS_ROOT / "README.md",

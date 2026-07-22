@@ -9,14 +9,16 @@
 
 > **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
 
-![tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
-![python](https://img.shields.io/badge/python-3.14-3776ab)
+![tests](https://img.shields.io/badge/tests-134%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.12-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
 ![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
 ![scope](https://img.shields.io/badge/scope-network%20%C2%B7%20host%20%C2%B7%20AD%20%C2%B7%20web-1f6feb)
 
-Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus is built the other way around** — every action flows through a 7-layer fail-closed guardrail first, an agent loop decides what to run next from the evidence it has, and a deterministic engine chains findings into multi-step attack paths. The result is safe enough to run near regulated systems and smart enough to find what a checklist misses.
+Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus V1 is built around a deterministic guardrail and sandboxed collectors.** V2 agent, continuous, and evidence-graph modules are experimental scaffolding and are not a production continuous service.
+
+> **Maturity: alpha.** Use V1 only for supervised, explicitly authorized testing in a separately verified lab. It is not approved for unattended, network-exposed, multi-user, production, regulated, or 24/7 deployment. The web console is localhost-only and live web execution is disabled by default. See [Phase 1 safety boundaries](docs/PHASE1_SAFETY_BOUNDARY_IMPLEMENTATION.md).
 
 > 🛡️ **Authorized internal security testing only.** Ships with a fully-isolated, intentionally-vulnerable lab — run there first. Live use requires written authorization, a defined CIDR scope, and a regulated-systems exclusion list.
 
@@ -111,7 +113,7 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 export PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32)   # required — refuses to run unaudited
 # optional AI: export ANTHROPIC_API_KEY=…   or   export AEGIS_OLLAMA_MODEL=qwen2.5:7b-instruct
 
-# Web console + animated architecture page
+  # Localhost-only web console; dry-run is server-enforced by default
 uvicorn aegis.web:app --host 127.0.0.1 --port 8800      # http://127.0.0.1:8800
 
 # Or the CLI
@@ -134,7 +136,7 @@ REFUSED target 167772165: scope: 10.0.0.5/32 outside allowed scope
 
 ## The bundled lab
 
-A fully-isolated, intentionally-vulnerable lab to exercise every module safely — on an `internal: true` Docker network with **no route to the host LAN or internet** (proven by `scripts/verify-isolation.sh`).
+An intentionally vulnerable lab configured on an `internal: true` Docker network. Treat isolation as a deployment prerequisite to verify independently; `scripts/verify-isolation.sh` is a diagnostic helper, not proof against every host/runtime route.
 
 ```
 targets/   Juice Shop · DVWA · Samba · misconfigured Linux SSH host · anonymous-bind LDAP · Kali attacker
@@ -149,14 +151,14 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Security posture
 
-> **Read-only everywhere** except a hard-gated PoC verifier. Credentialed checks use null/guest/audit accounts. WinRM defaults to HTTPS + cert validation; SSH key-auth preferred. Credentials are **never** logged — the audit records only the check + target; secrets and sensitive data are redacted from all output. The PoC runner refuses unless **all three** gates pass: armed (`--arm poc`) **and** target inside `AEGIS_LAB_NET` **and** `AEGIS_POC_CONFIRM_ISOLATED=1`. Before any live use: written authorization + CIDR scope + exclusions for regulated systems. See [`aegis/SECURITY.md`](aegis/SECURITY.md).
+> **Default posture:** the V1 CLI is sandbox-first and dry-run capable; some explicitly selected profiles and PoC paths can emit traffic or execute remote checks. The PoC runner requires all three gates: armed (`--arm poc`), target inside `AEGIS_LAB_NET`, and `AEGIS_POC_CONFIRM_ISOLATED=1`. The localhost-only web console rejects request-selected live/armed modes and defaults to dry-run; host and AD web endpoints are denied unless live mode is enabled in server startup configuration. Before any live use: written authorization, CIDR scope, exclusions, separately verified isolation, and non-production credentials. See [`aegis/SECURITY.md`](aegis/SECURITY.md).
 
 ## Tests
 
-75 passing — guardrail (22), agent/chains/planner/PoC (17), Windows+AD (8), web recon (8), recon modules (8), Linux host (6), heuristics (4), end-to-end integration (2).
+Current Phase 1 collection: **134 tests** on Python 3.12. Historical counts in the build log remain labeled as snapshots rather than current results.
 
 ```bash
-cd aegis && PENTEST_AUDIT_HMAC_KEY=test python -m pytest -q
+cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
 ```
 
 ## Docs

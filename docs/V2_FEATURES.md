@@ -1,6 +1,10 @@
 # Argus V2 — Complete Feature Documentation
 
-**Extensive explanation of every major feature with diagrams.**
+> **Status: experimental feature design.** Implemented V1 behavior, partial V2 scaffolding, and
+> future target behavior are described together below; this is not a production-readiness or
+> 24/7 deployment claim.
+
+**Extensive explanation of the V2 feature design with diagrams.**
 
 ---
 
