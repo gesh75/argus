@@ -114,7 +114,7 @@ def test_oversize_json_is_rejected_before_route_validation() -> None:
 
 
 def test_validation_errors_do_not_echo_request_secrets() -> None:
-    secret = "super-secret-password-value"
+    secret = "super-secret-password-value"  # noqa: S105 - synthetic non-production fixture
     with _client("127.0.0.1") as client:
         response = client.post(
             "/api/host",
