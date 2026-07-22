@@ -1,18 +1,25 @@
-"""Aegis web GUI — FastAPI dashboard to launch sandbox scans and view findings.
+"""Argus localhost-only web console.
 
 Run:  PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) \\
         uvicorn aegis.web:app --host 127.0.0.1 --port 8800
-Then open http://127.0.0.1:8800  (bind localhost only — operator console).
+Then open http://127.0.0.1:8800.
+
+The application independently enforces a loopback ASGI socket peer. Proxy and Host
+headers are never used for authorization. Live execution is disabled unless the server
+starts with ``ARGUS_WEB_LIVE_ENABLED=1``; request JSON cannot select live or armed mode.
 """
 from __future__ import annotations
 
+import ipaddress
+import os
 import threading
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .config import DEFAULT_POLICY, Policy
 from .guardrail import Guardrail, GuardrailError
@@ -27,36 +34,102 @@ STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 
 app = FastAPI(title="Argus", version="0.1.0")
 
+MAX_REQUEST_BODY_BYTES = 64 * 1024
+WEB_LIVE_ENABLED = os.environ.get("ARGUS_WEB_LIVE_ENABLED", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
+_CSP = (
+    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; "
+    "base-uri 'none'; frame-ancestors 'none'"
+)
+
 # Serialize scans: the HMAC audit chain must stay linear. Sync handlers run in a
 # threadpool, so concurrent scans would fork the chain — one operator, one scan at a time.
 _SCAN_LOCK = threading.Lock()
 
 
-class ScanRequest(BaseModel):
-    targets: list[str]
-    dry_run: bool = True
-    arm: list[str] = []
+class StrictRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class ScanRequest(StrictRequest):
+    targets: list[str] = Field(min_length=1, max_length=64)
     provider: str | None = None          # anthropic | ollama | heuristic (None = auto)
     ollama_model: str | None = None      # e.g. gemma3:4b, llama3.1:8b
-    profile: str = "default"             # scan profile (see orchestrator.PROFILES)
+    profile: str = Field(default="default", min_length=1, max_length=64)
 
 
-class HostRequest(BaseModel):
-    target: str
-    os: str = "linux"                    # linux | windows
-    user: str = "pentest"
-    password: str = "pentest"  # noqa: S105 - lab default cred, overridden by operator
-    profile: str = "host-linux"
-    dry_run: bool = False                # windows dry-run when no live host
+class HostRequest(StrictRequest):
+    target: str = Field(min_length=1, max_length=255)
+    os: str = Field(default="linux", pattern="^(linux|windows)$")
+    user: str = Field(default="pentest", min_length=1, max_length=128)
+    password: str = Field(default="pentest", max_length=1024)  # noqa: S105
+    profile: str = Field(default="host-linux", min_length=1, max_length=64)
     provider: str | None = None
     ollama_model: str | None = None
 
 
-class ADRequest(BaseModel):
-    target: str
-    base: str = "dc=ecp,dc=lab"
+class ADRequest(StrictRequest):
+    target: str = Field(min_length=1, max_length=255)
+    base: str = Field(default="dc=ecp,dc=lab", min_length=1, max_length=512)
     provider: str | None = None
     ollama_model: str | None = None
+
+
+def _is_loopback_peer(host: str) -> bool:
+    """Accept only an IP loopback from the actual ASGI socket peer."""
+    try:
+        address = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return address.is_loopback
+
+
+def _error(message: str, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        {"error": message},
+        status_code=status_code,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.middleware("http")
+async def enforce_local_console_boundary(request: Request, call_next):  # noqa: ANN001
+    """Enforce the deployment boundary from the socket peer, never proxy headers."""
+    peer = request.scope.get("client")
+    peer_host = peer[0] if peer else ""
+    if not _is_loopback_peer(peer_host):
+        return _error("localhost-only console", 403)
+
+    if request.url.path.startswith("/api/"):
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > MAX_REQUEST_BODY_BYTES:
+                    return _error("request body too large", 413)
+            except ValueError:
+                return _error("invalid content length", 400)
+
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = _CSP
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request: Request, _exc: RequestValidationError) -> JSONResponse:
+    """Do not reflect credentials, tokens, or complete request bodies."""
+    return _error("invalid request", 422)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -81,6 +154,8 @@ def policy() -> dict:
             "armed_only": sorted(p.tool_armed_only),
             "profiles": {k: v for k, v in PROFILES.items()},
             "tool_count": len(REGISTRY),
+            "live_enabled": WEB_LIVE_ENABLED,
+            "deployment": "localhost-only; proxy headers ignored",
             "budget": {"usd": p.budget.max_usd, "wall_s": p.budget.max_wall_seconds}}
 
 
@@ -102,6 +177,8 @@ def _result_payload(result, guard, mode: str) -> dict:
 @app.post("/api/host")
 def host(req: HostRequest) -> JSONResponse:
     from .host.ad import ADOrchestrator  # noqa: F401 (kept local for symmetry)
+    if not WEB_LIVE_ENABLED:
+        return _error("live web execution is disabled", 403)
     try:
         guard = Guardrail(Policy.load(DEFAULT_POLICY))
     except GuardrailError as exc:
@@ -112,13 +189,8 @@ def host(req: HostRequest) -> JSONResponse:
     with _SCAN_LOCK:
         if req.os == "windows":
             from .host.winrm_collector import WinHostOrchestrator, WinRMCollector, WinRMCreds
-            if req.dry_run:
-                # No real Windows host on Mac -> replay a realistic vulnerable-Windows fixture
-                from .host.win_fixtures import FixtureWinRM
-                collector, mode = FixtureWinRM(), "windows-fixture"
-            else:
-                collector = WinRMCollector(WinRMCreds(user=req.user, password=req.password))
-                mode = "windows-live"
+            collector = WinRMCollector(WinRMCreds(user=req.user, password=req.password))
+            mode = "windows-live"
             orch = WinHostOrchestrator(guard, collector, ai_provider=req.provider,
                                        ai_ollama_model=req.ollama_model)
             prof = req.profile if req.profile.startswith("host-windows") else "host-windows"
@@ -139,6 +211,8 @@ def host(req: HostRequest) -> JSONResponse:
 @app.post("/api/ad")
 def ad(req: ADRequest) -> JSONResponse:
     from .host.ad import ADOrchestrator
+    if not WEB_LIVE_ENABLED:
+        return _error("live web execution is disabled", 403)
     try:
         guard = Guardrail(Policy.load(DEFAULT_POLICY))
     except GuardrailError as exc:
@@ -158,14 +232,15 @@ def ad(req: ADRequest) -> JSONResponse:
 @app.post("/api/scan")
 def scan(req: ScanRequest) -> JSONResponse:
     try:
-        guard = Guardrail(Policy.load(DEFAULT_POLICY), armed=frozenset(req.arm))
+        guard = Guardrail(Policy.load(DEFAULT_POLICY))
     except GuardrailError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     refused = [t for t in req.targets if not guard.check_target(t).allowed]
     if refused:
         return JSONResponse({"error": f"out-of-scope targets refused: {refused}"},
                             status_code=400)
-    sandbox = DryRunSandbox() if req.dry_run else DockerSandbox(COMPOSE)
+    live_enabled = WEB_LIVE_ENABLED
+    sandbox = DockerSandbox(COMPOSE) if live_enabled else DryRunSandbox()
     with _SCAN_LOCK:
         orch = Orchestrator(guard, sandbox, ai_provider=req.provider,
                             ai_ollama_model=req.ollama_model)
@@ -179,5 +254,5 @@ def scan(req: ScanRequest) -> JSONResponse:
         "errors": collapse_errors(result.errors),
         "usd": round(guard.budget.usd, 4),
         "audit_valid": audit_valid,
-        "mode": "dry-run" if req.dry_run else "live",
+        "mode": "live" if live_enabled else "dry-run",
     })
