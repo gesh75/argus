@@ -20,6 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .config import DEFAULT_POLICY, Policy
 from .guardrail import Guardrail, GuardrailError
@@ -80,6 +81,81 @@ class ADRequest(StrictRequest):
     ollama_model: str | None = None
 
 
+class RequestBodyLimitMiddleware:
+    """Bound API request bodies by counting ASGI bytes before route parsing."""
+
+    _BODY_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if (
+            scope["type"] != "http"
+            or not scope.get("path", "").startswith("/api/")
+            or scope.get("method", "GET").upper() not in self._BODY_METHODS
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        content_length = next(
+            (
+                value
+                for name, value in scope.get("headers", ())
+                if name.lower() == b"content-length"
+            ),
+            None,
+        )
+        if content_length is not None:
+            try:
+                declared_size = int(content_length)
+            except ValueError:
+                await _error("invalid content length", 400)(scope, receive, send)
+                return
+            if declared_size < 0:
+                await _error("invalid content length", 400)(scope, receive, send)
+                return
+            if declared_size > self.max_body_bytes:
+                await _error("request body too large", 413)(scope, receive, send)
+                return
+
+        buffered: list[Message] = []
+        total = 0
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                buffered.append(message)
+                break
+
+            total += len(message.get("body", b""))
+            if total > self.max_body_bytes:
+                await _error("request body too large", 413)(scope, receive, send)
+                return
+
+            buffered.append(message)
+            if not message.get("more_body", False):
+                break
+
+        buffered_messages = iter(buffered)
+
+        async def replay_receive() -> Message:
+            try:
+                return next(buffered_messages)
+            except StopIteration:
+                return await receive()
+
+        await self.app(scope, replay_receive, send)
+
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=MAX_REQUEST_BODY_BYTES,
+)
+
+
 def _is_loopback_peer(host: str) -> bool:
     """Accept only an IP loopback from the actual ASGI socket peer."""
     try:
@@ -106,15 +182,6 @@ async def enforce_local_console_boundary(request: Request, call_next):  # noqa: 
     peer_host = peer[0] if peer else ""
     if not _is_loopback_peer(peer_host):
         return _error("localhost-only console", 403)
-
-    if request.url.path.startswith("/api/"):
-        content_length = request.headers.get("content-length")
-        if content_length is not None:
-            try:
-                if int(content_length) > MAX_REQUEST_BODY_BYTES:
-                    return _error("request body too large", 413)
-            except ValueError:
-                return _error("invalid content length", 400)
 
     response = await call_next(request)
     response.headers["Content-Security-Policy"] = _CSP
