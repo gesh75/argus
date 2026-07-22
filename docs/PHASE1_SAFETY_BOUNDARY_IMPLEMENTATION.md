@@ -18,10 +18,11 @@ implementing Phase 2.
   Host and AD web endpoints return 403 unless the server starts with
   `ARGUS_WEB_LIVE_ENABLED=1`. Even then, the service remains a localhost-only, single-operator
   console and is not approved for network or multi-user deployment.
-- **Web input/output:** API bodies with a declared size over 64 KiB are rejected before JSON
-  validation. Validation errors are generic and do not echo request fields. API responses use
-  `Cache-Control: no-store`; browser output uses DOM construction and `textContent`, and
-  severity classes come from a fixed allowlist.
+- **Web input/output:** API bodies with a declared size over 64 KiB are rejected before reading,
+  and an ASGI receive wrapper counts actual streamed bytes so missing, chunked, or false length
+  headers cannot exceed the 64 KiB limit. Validation errors are generic and do not echo request
+  fields. API responses use `Cache-Control: no-store`; browser output uses DOM construction and
+  `textContent`, and severity classes come from a fixed allowlist.
 - **Dependency and package:** `networkx>=3.2,<4` is a declared runtime dependency and is
   hash-locked as `networkx==3.6.1`. Package metadata is `argus-security 0.1.0`, declares all
   runtime dependencies, exposes the `argus` CLI, and includes the static console.
@@ -40,7 +41,7 @@ pip-audit -r requirements.lock --strict --desc
 python -m build
 ```
 
-The Phase 1 branch collects **134 tests**. Exact final pass counts and the immutable tested SHA
+The Phase 1 branch collects **139 tests**. Exact final pass counts and the immutable tested SHA
 are recorded in the draft pull request and delivery report.
 
 ## Historical versus current results

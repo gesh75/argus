@@ -4,7 +4,7 @@
 
 > **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
 
-![tests](https://img.shields.io/badge/tests-134%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-139%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
@@ -133,7 +133,7 @@ REFUSED target 167772165: scope: 10.0.0.5/32 outside allowed scope
 
 ## Tests
 
-Current Phase 1 collection: **134 tests** on Python 3.12. Older totals in `BUILD_AND_TEST_LOG.md` are retained as labeled historical snapshots.
+Current Phase 1 collection: **139 tests** on Python 3.12. Older totals in `BUILD_AND_TEST_LOG.md` are retained as labeled historical snapshots.
 
 ```bash
 PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q

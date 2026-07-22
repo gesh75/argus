@@ -4,7 +4,7 @@ Historical record of what was built and how it was validated. Companion to `READ
 (usage), `SECURITY.md` (posture), and the animated `/architecture` page (overview).
 
 > Historical snapshots below preserve the results reported at the time; their exact commit was
-> not recorded. They are not current Phase 1 verification. Current collection: **134 tests** on
+> not recorded. They are not current Phase 1 verification. Current collection: **139 tests** on
 > Python 3.12. Current command:
 > `PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q`.
 
