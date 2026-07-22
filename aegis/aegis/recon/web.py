@@ -13,6 +13,7 @@ Safety:
 """
 from __future__ import annotations
 
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
@@ -66,33 +67,60 @@ class HttpResult:
     status: int
     body: str
     server: str = ""
+    location: str = ""
 
 
 class Transport(Protocol):
     def get(self, url: str, timeout: int) -> HttpResult: ...
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Return redirect responses to the caller without opening another connection."""
+
+    def http_error_302(self, req, fp, code, msg, headers):  # noqa: ANN001
+        return fp
+
+    http_error_301 = http_error_302
+    http_error_303 = http_error_302
+    http_error_307 = http_error_302
+    http_error_308 = http_error_302
+
+
 class HttpTransport:
-    """Live read-only HTTP. GET only, capped body, follows up to a few redirects."""
+    """Live read-only HTTP. GET only, capped body, and no redirect following.
+
+    Phase 1 refuses every redirect response. Relative and absolute ``Location`` values
+    are returned as metadata only; neither form is re-authorized or requested.
+    """
 
     def __init__(self, max_body: int = 4096):
         self.max_body = max_body
+        self._opener = urllib.request.build_opener(_NoRedirectHandler())
 
     def get(self, url: str, timeout: int) -> HttpResult:
         req = urllib.request.Request(url, method="GET",  # noqa: S310
                                      headers={"User-Agent": "Argus-Recon/1.0"})
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 scheme validated by scope guard  # noqa: S310
+            with self._opener.open(req, timeout=timeout) as resp:  # nosec B310 scheme validated by scope guard  # noqa: S310
                 body = resp.read(self.max_body).decode("utf-8", "replace")
-                return HttpResult(resp.status, body, resp.headers.get("Server", ""))
+                return HttpResult(
+                    resp.status,
+                    body,
+                    resp.headers.get("Server", ""),
+                    resp.headers.get("Location", ""),
+                )
         except urllib.error.HTTPError as exc:  # 401/403/404 still informative
             body = b""
             try:
                 body = exc.read(self.max_body)
             except Exception:  # noqa: BLE001, S110 - error body is best-effort
                 pass
-            return HttpResult(exc.code, body.decode("utf-8", "replace"),
-                              exc.headers.get("Server", "") if exc.headers else "")
+            return HttpResult(
+                exc.code,
+                body.decode("utf-8", "replace"),
+                exc.headers.get("Server", "") if exc.headers else "",
+                exc.headers.get("Location", "") if exc.headers else "",
+            )
         except Exception:  # noqa: BLE001 — connection refused/timeout = no service
             return HttpResult(0, "")
 
@@ -106,7 +134,7 @@ class SandboxTransport:
         self.max_body = max_body
 
     def get(self, url: str, timeout: int) -> HttpResult:
-        argv = ["curl", "-s", "-i", "-m", str(timeout), "-A",
+        argv = ["curl", "-s", "-i", "--max-redirs", "0", "-m", str(timeout), "-A",
                 "Argus-Recon/1.0", url]
         ex = self.sandbox.run(argv, timeout=timeout + 3)
         return self._parse(ex.stdout)
@@ -117,7 +145,7 @@ class SandboxTransport:
         head, _, body = raw.partition("\r\n\r\n")
         if not body:
             head, _, body = raw.partition("\n\n")
-        status, server = 0, ""
+        status, server, location = 0, "", ""
         for line in head.splitlines():
             if line.startswith("HTTP/"):
                 parts = line.split()
@@ -125,7 +153,9 @@ class SandboxTransport:
                     status = int(parts[1])
             elif line.lower().startswith("server:"):
                 server = line.split(":", 1)[1].strip()
-        return HttpResult(status, body[:self.max_body], server)
+            elif line.lower().startswith("location:"):
+                location = line.split(":", 1)[1].strip()
+        return HttpResult(status, body[:self.max_body], server, location)
 
 
 class FixtureTransport:
