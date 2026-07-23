@@ -79,6 +79,17 @@ loading, translates internal integrity failures into redacted
 `AuditLog` does not keep an authoritative in-memory chain tip. Every append
 derives its next state from a locked, strict replay of disk state.
 
+Normal `AuditLog(policy)` construction is write-capable and remains fail
+closed: it raises before returning if the log or configured anchor is not in a
+normal admissible state.
+
+The façade also provides an internal CLI-only diagnostic construction path.
+That path returns a write-disabled diagnostic façade capable of reporting
+structured log and anchor states. It cannot call `write()` or be attached to a
+normal `Guardrail`. Anchor bootstrap and reconciliation begin through this
+diagnostic path, then permit only their explicitly confirmed anchor mutation
+while retaining the same outer operation lock.
+
 ### 4.2 `aegis/aegis/audit_storage.py`
 
 A new, narrowly scoped internal module owns:
@@ -107,19 +118,24 @@ audit storage lock is held.
 The existing `argus audit` verification behavior remains available. Explicit
 operator-only modes are added for anchor bootstrap and reconciliation. The
 operations require a confirmation option and never modify audit records.
+Unlike normal application startup, these commands use the read-only diagnostic
+construction path so corruption or anchor inconsistency can be classified
+without creating a write-capable `AuditLog`.
 
 ## 5. Locking protocol
 
 ### 5.1 Lock identity
 
-The audit-log path is canonicalized before any file is opened. The lock path is
-derived solely from that canonical path by appending `.lock` to the log
-filename. For example:
+The configured audit parent is resolved once under the trusted-parent model in
+Section 11.1. The lock path is derived solely from that accepted parent
+identity and audit basename by appending `.lock` to the log filename. For
+example:
 
 `/var/lib/argus/audit.ndjson` → `/var/lib/argus/audit.ndjson.lock`
 
-Aliases that resolve to the same accepted audit path therefore use the same
-lock. Existing symlink components are rejected rather than followed.
+Paths accepted as the same resolved trusted parent and basename therefore use
+the same lock. Phase 2A does not claim that arbitrary pathname aliases or
+adversarially replaced intermediate components are race-free.
 
 ### 5.2 Lock order
 
@@ -132,9 +148,28 @@ path-keyed re-entrant lock and protects separate `AuditLog` instances and
 threads in one process. The interprocess lock is an exclusive
 `fcntl.flock(LOCK_EX)` on the canonical lock file.
 
+Each outer operation opens exactly one lock-file descriptor and successfully
+acquires `flock` exactly once through that descriptor. An outer operation is
+one startup validation, diagnostic inspection, verification, append,
+cross-check, bootstrap, reconciliation, or chain-tip inspection. Replay,
+anchor, append, and verification helpers receive an explicit already-held
+lock context. They must not reopen the lock file or recursively acquire the
+kernel lock. The successful lock is released exactly once when the outer
+operation closes its lock-file descriptor.
+
 An exclusive lock is used for startup replay, verification, append, anchor
 validation, anchor bootstrap, anchor reconciliation, and chain-tip inspection.
 Verification cannot read while another process appends.
+
+Lock acquisition has a fixed 10.0-second monotonic deadline. The implementation
+opens one descriptor, attempts `LOCK_EX | LOCK_NB` on that same descriptor,
+and retries boundedly on contention until the deadline. Polling attempts do not
+open another descriptor. `EINTR` is retried within the same deadline. Timeout
+or any other lock error fails closed with a redacted `GuardrailError`; the
+deadline is not configurable through policy, environment variables, CLI
+arguments, or API inputs. Once acquired, the operation has no artificial
+10-second execution deadline: it retains the lock until its durability or
+failure boundary is reached.
 
 The lock file is opened with close-on-exec and no-follow protections described
 below. Its presence after a process terminates is expected and harmless:
@@ -154,6 +189,11 @@ The exclusive lock covers:
 
 The lock is released only after the operation has either crossed its defined
 durability boundary or failed closed.
+
+Every numbered step is implemented by a lock-held helper. A helper that is
+called without the outer operation's lock context is an internal programming
+error and fails before disk access; helpers never attempt implicit lock
+recovery or nested `flock`.
 
 ## 6. Strict JSON decoding
 
@@ -349,12 +389,32 @@ controller compromise, or storage-administrator action.
 
 ## 11. Filesystem protections
 
-### 11.1 Canonical paths and file types
+### 11.1 Trusted-parent-directory model
 
-Audit, lock, and anchor paths are converted to absolute normalized paths after
-validating existing path components with `lstat`. Symlink path components and
-symlink final files are rejected. Missing controlled directories are created
-without following symlinks.
+Phase 2A uses an explicitly limited trusted-parent-directory model; it does not
+claim race-free component-by-component pathname traversal.
+
+The audit and anchor parent directories must be provisioned before Argus starts.
+For each configured file, Argus resolves the parent to an absolute real path
+once, opens that parent as a directory with `O_DIRECTORY | O_CLOEXEC`, and
+verifies with `fstat` that it is a directory owned by the effective Argus user
+and is not group- or world-writable. All final lock, log, anchor, and temporary
+anchor operations are then performed relative to the held parent-directory
+descriptor. Final entries use no-follow opens where supported and are checked
+with `fstat`.
+
+The operational trust assumption is that root, filesystem administrators, and
+other actors able to rename or replace an ancestor or mount point do not do so
+during an Argus operation. Initial parent resolution may follow operating
+system-managed intermediate symlinks. Phase 2A therefore does not guarantee
+protection against intermediate-component symlink races or mount replacement.
+Deployments requiring that guarantee must provision a stable trusted parent or
+adopt future component-wise `openat` traversal outside this phase.
+
+Argus does not create missing parent-directory trees. A missing, unsafe, or
+unopenable trusted parent fails closed. The accepted parent descriptor remains
+open for the outer operation so final-name operations cannot be redirected by
+renaming the originally resolved pathname during that operation.
 
 Every opened lock, log, temporary-anchor, and anchor object must be a regular
 file. Devices, sockets, FIFOs, directories, and other non-regular types are
@@ -364,8 +424,9 @@ rejected.
 
 New lock, log, temporary-anchor, and anchor files are created with mode
 `0600`, subject to platform behavior, and verified after opening. File
-descriptors use `O_CLOEXEC`. Final-path opens use `O_NOFOLLOW` where supported,
-with `lstat`/`fstat` identity checks retained as defense in depth.
+descriptors use `O_CLOEXEC`. Final-entry opens relative to the trusted parent
+use `O_NOFOLLOW` where supported, with `fstat` checks retained as defense in
+depth.
 
 Existing files must:
 
@@ -385,9 +446,10 @@ backup readers, or hostile storage.
 ### 11.3 Anchor temporary files
 
 Atomic anchor writes use a uniquely named mode-`0600` temporary regular file
-created with exclusive creation in the anchor's own directory. The writer
-fully writes and `fsync`s the temporary file, atomically replaces the final
-anchor with `os.replace`, and `fsync`s the anchor directory.
+created with exclusive creation relative to the anchor parent descriptor. The
+writer fully writes and `fsync`s the temporary file, atomically replaces the
+final anchor using source and destination directory descriptors, and `fsync`s
+the anchor directory.
 
 Temporary anchor files never leave the controlled anchor directory. Under the
 audit lock, abandoned files matching Argus's exact private temporary-name
@@ -413,16 +475,24 @@ It has exactly:
 Duplicate keys, extra keys, missing keys, non-object values, invalid UTF-8,
 non-finite numbers, and trailing data are malformed.
 
+Anchor `ts` is a copy of the audit record's signed `ts` at anchor `seq`; it is
+not the time at which the anchor file was written, replaced, bootstrapped, or
+reconciled. It is used only as consistency metadata and must equal the
+corresponding verified record timestamp for `match` or `stale`
+classification. It is not a trusted clock, freshness guarantee, monotonic
+counter, or substitute for `seq`.
+
 While holding the audit lock, a configured anchor is classified as:
 
 - **uninitialized:** log is empty and anchor is absent;
-- **match:** `seq` equals the log sequence and `tip` equals the final log HMAC;
+- **match:** `seq`, `tip`, and `ts` equal the final verified log record's
+  sequence, HMAC, and timestamp;
 - **missing:** log is populated and anchor is absent;
-- **stale:** anchor `seq` is less than log sequence and `tip` equals the HMAC
-  at that exact sequence in the verified log;
+- **stale:** anchor `seq` is less than log sequence and its `tip` and `ts`
+  equal the HMAC and timestamp at that exact sequence in the verified log;
 - **ahead:** anchor `seq` is greater than log sequence;
-- **divergent:** anchor sequence exists in the log but its tip does not match
-  the HMAC at that sequence;
+- **divergent:** anchor sequence exists in the log but its tip or timestamp
+  does not match the verified record at that sequence;
 - **malformed:** strict anchor decoding or schema validation fails.
 
 Normal startup and append accept only `uninitialized` for an empty log or
@@ -444,8 +514,8 @@ The command:
 3. requires a configured anchor path;
 4. requires the anchor to be absent;
 5. strictly replays and cryptographically verifies the complete audit log;
-6. writes the current verified sequence, tip, and timestamp to the anchor
-   using the durable atomic protocol;
+6. writes the current verified sequence, tip, and final record's signed `ts`
+   to the anchor using the durable atomic protocol;
 7. never changes the audit log;
 8. prints a redacted console acknowledgement containing the operation and
    sequence, but not the tip or any event data.
@@ -454,10 +524,12 @@ Bootstrap is refused for an empty log, an existing anchor, malformed history,
 an invalid HMAC, a sequence or `prev` discontinuity, an unsafe file, or a
 failed durability operation.
 
-The CLI enters a narrowly scoped recovery construction path that bypasses only
-the normal requirement that a populated log already have a matching anchor.
-It does not bypass log replay, cryptographic verification, filesystem checks,
-locking, or explicit confirmation.
+The CLI enters the write-disabled diagnostic construction path, which bypasses
+only the normal requirement that a populated log already have a matching
+anchor. After classification and confirmation, the same outer operation may
+write only the anchor. It does not bypass log replay, cryptographic
+verification, filesystem checks, locking, or explicit confirmation, and it
+never enables audit-log writes.
 
 ## 14. Anchor reconciliation
 
@@ -476,8 +548,8 @@ The command:
 4. strictly validates and classifies the existing anchor;
 5. proceeds only when the anchor is **stale**, meaning its stored tip matches
    the verified log HMAC at its stored sequence;
-6. advances only the anchor to the current verified log tip using the durable
-   atomic protocol;
+6. advances only the anchor to the current verified log sequence, tip, and
+   final record's signed `ts` using the durable atomic protocol;
 7. never removes, rewrites, truncates, or repairs an audit record;
 8. prints a redacted console acknowledgement with the old and new sequence
    numbers, but no tips or event data.
@@ -490,9 +562,11 @@ verified log uses bootstrap, not reconciliation.
 The console acknowledgement is the separate operational evidence required for
 this recovery. Phase 2A does not add a second operational log.
 
-As with bootstrap, the recovery construction path bypasses only the normal
-anchor-match admission check needed to classify and advance a proven stale
-anchor. It cannot bypass any audit-log or filesystem validation.
+As with bootstrap, the write-disabled diagnostic construction path bypasses
+only the normal anchor-match admission check needed to classify and advance a
+proven stale anchor. The same outer operation and already-held lock are retained
+through classification and anchor replacement. It cannot bypass any audit-log
+or filesystem validation or enable an audit-log append.
 
 ## 15. Commit states and failure behavior
 
@@ -532,6 +606,67 @@ It does not raise detailed parsing exceptions to callers.
 `cross_check_anchor()` retains `(bool, str)`. Its reason uses stable categories
 such as `anchor missing`, `anchor stale`, `anchor ahead`, `anchor divergent`,
 or `anchor malformed`; it does not expose HMAC tips or record values.
+
+### 16.1 Read-only diagnostic construction
+
+`argus audit` must remain useful precisely when normal startup refuses the
+audit state. It therefore does not construct `Guardrail` or invoke normal
+write-capable `AuditLog(policy)` construction. It uses the internal diagnostic
+factory, which:
+
+- loads the key and validates the supported platform and trusted parents;
+- creates a façade permanently marked write-disabled;
+- acquires the in-process lock and one `flock` for the outer diagnostic
+  operation;
+- strictly decodes and verifies the complete log when possible;
+- strictly decodes the anchor independently;
+- returns a structured diagnostic report rather than raising for integrity
+  classifications;
+- closes the outer lock before returning the report.
+
+The report has separate log and anchor categories. Log categories include
+`empty`, `valid-v1`, `valid-v2`, `valid-v1-v2`, `malformed`, `invalid-schema`,
+`invalid-sequence`, `invalid-prev`, and `invalid-hmac`. Anchor categories
+include `disabled`, `uninitialized`, `match`, `missing`, `stale`, `ahead`,
+`divergent`, `malformed`, and `not-comparable`.
+
+If the log is invalid, an absent or independently malformed anchor can still be
+classified as `missing` or `malformed`, but a well-formed anchor is
+`not-comparable` because stale, ahead, divergent, and match require a verified
+log. Diagnostics never infer a chain tip from invalid history.
+
+The diagnostic façade's `write()` path is absent or unconditionally raises a
+redacted `GuardrailError`. It cannot be converted into a normal `AuditLog`,
+attached to `Guardrail`, or returned to application callers. Bootstrap and
+reconciliation use the same diagnostic session internally, but retain the
+outer lock and re-check their exact preconditions before their one permitted
+anchor-only mutation.
+
+### 16.2 CLI exit codes
+
+`argus audit`, bootstrap, and reconciliation use these exit codes:
+
+| Code | Meaning |
+|---|---|
+| `0` | Diagnosis completed with a valid log and an admissible anchor state, or the explicitly requested anchor recovery completed durably |
+| `1` | Diagnosis completed and found an integrity/consistency failure, or a recovery precondition was not satisfied |
+| `2` | Invocation, configuration, platform, key, trusted-parent, permission, lock-timeout, or I/O failure prevented a reliable diagnosis or durable recovery |
+
+For plain `argus audit`, code 0 requires a valid log plus one of: anchoring
+disabled, an empty log with an uninitialized anchor, or a matching anchor.
+Malformed history and missing, stale, ahead, divergent, malformed, or
+not-comparable configured anchors return code 1.
+
+For bootstrap or reconciliation, code 0 means the anchor replacement and
+directory `fsync` completed. An invalid log, an anchor state outside the
+operation's allowed precondition, or refused confirmation returns code 1.
+Syntactically missing required CLI arguments continue to use argparse's code 2;
+key loading failure, unsupported platform, unsafe trusted parent, lock
+deadline, and durability failure also return code 2.
+
+Console output contains only the stable redacted categories and permitted
+sequence numbers. It never includes raw records, HMAC tips, keys, tokens,
+credentials, findings, or sensitive output.
 
 All internal exceptions are translated at the façade. Messages may contain a
 record number, path role such as `audit log` or `anchor`, and a stable error
@@ -593,6 +728,13 @@ Additional focused tests cover:
 - symlink, non-regular-file, unsafe-owner, and unsafe-mode rejection;
 - anchor bootstrap success and refusal states;
 - anchor reconciliation success and refusal states;
+- read-only diagnostic classification and CLI exit codes;
+- one lock descriptor and one successful `flock` acquisition per outer
+  operation, with no helper-level reacquisition;
+- deterministic failure at the 10-second lock deadline;
+- trusted-parent rejection and final-entry no-follow checks without asserting
+  intermediate-component race protection;
+- anchor timestamp match, stale comparison, and divergence;
 - crash after log durability and crash after anchor durability;
 - short writes completed by the production write loop;
 - lock release after process termination.
@@ -658,10 +800,13 @@ Before deployment:
 6. run verification;
 7. if enabling anchoring on a populated verified log, run explicit bootstrap.
 
-Phase 2A writes V2 records that the Phase 1 reader can parse and HMAC-check,
-but a rolled-back Phase 1 writer would append a V1 record after V2. Phase 2A
-correctly rejects that mixed order. Therefore rollback must never point a
-Phase 1 writer at a log that already contains V2 records.
+Phase 1 can JSON-parse a V2 record, but it cannot HMAC-verify the V2
+domain-separated signature. Its verifier uses the V1 signing input and
+therefore reports a valid V2 record as tampered. A Phase 1 writer must never
+open, verify for operational acceptance, or append to any log containing a V2
+record. In particular, a rolled-back Phase 1 writer would both mis-verify the
+existing V2 record and append a V1 record after V2, creating an ordering that
+Phase 2A correctly rejects.
 
 Safe rollback options are:
 
