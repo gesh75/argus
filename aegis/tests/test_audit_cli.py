@@ -109,3 +109,36 @@ def test_audit_help_exposes_mutually_exclusive_recovery_flags(capsys) -> None:
             ["audit", "--bootstrap-anchor", "--reconcile-anchor"]
         )
     assert conflict.value.code == 2
+
+
+def test_cli_bootstrap_requires_confirmation_then_succeeds(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    no_anchor_path = policy_file(tmp_path)
+    policy = Policy.load(no_anchor_path)
+    AuditLog(policy).write({"event": "one"})
+    configured_path = policy_file(tmp_path, anchor=True)
+    assert (
+        cli.main(
+            [
+                "--policy",
+                str(configured_path),
+                "audit",
+                "--bootstrap-anchor",
+            ]
+        )
+        == 2
+    )
+    assert (
+        cli.main(
+            [
+                "--policy",
+                str(configured_path),
+                "audit",
+                "--bootstrap-anchor",
+                "--confirm",
+            ]
+        )
+        == 0
+    )

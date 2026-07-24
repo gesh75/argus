@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import stat
+import json
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,16 @@ from aegis.anchor import (
     read_anchor_locked,
     write_anchor_locked,
 )
-from aegis.audit_storage import AnchorState, AuditStorage, FILE_MODE, replay_bytes
+from aegis.audit_storage import (
+    AnchorState,
+    AuditFailureCode,
+    AuditStorage,
+    AuditStorageError,
+    FILE_MODE,
+    replay_bytes,
+)
+from aegis.config import DEFAULT_POLICY, Policy
+from aegis.guardrail import AuditLog
 from tests.audit_support import TEST_KEY, signed_v1
 
 
@@ -155,3 +165,64 @@ def test_cleanup_removes_only_owned_regular_anchor_temps(tmp_path: Path) -> None
     assert not removable.exists()
     assert unrelated.exists()
     assert directory.is_dir()
+
+
+def diagnostic_policy(tmp_path: Path, monkeypatch) -> Policy:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    policy = Policy.load(DEFAULT_POLICY)
+    object.__setattr__(policy, "audit_path", tmp_path / "audit.ndjson")
+    object.__setattr__(policy, "audit_anchor_path", tmp_path / "anchor.json")
+    return policy
+
+
+def test_confirmed_bootstrap_changes_only_missing_anchor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    object.__setattr__(policy, "audit_anchor_path", None)
+    AuditLog(policy).write({"event": "one"})
+    before = policy.audit_path.read_bytes()
+    object.__setattr__(policy, "audit_anchor_path", tmp_path / "anchor.json")
+    diagnostic = AuditLog._for_diagnostics(policy)
+    report = diagnostic.bootstrap_anchor(confirmed=True)
+    assert report.anchor_state is AnchorState.MATCH
+    assert policy.audit_path.read_bytes() == before
+    assert (tmp_path / "anchor.json").exists()
+
+
+def test_bootstrap_refuses_empty_or_unconfirmed(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    diagnostic = AuditLog._for_diagnostics(policy)
+    with pytest.raises(AuditStorageError) as unconfirmed:
+        diagnostic.bootstrap_anchor(confirmed=False)
+    assert unconfirmed.value.code is AuditFailureCode.WRITE_DISABLED
+    with pytest.raises(AuditStorageError):
+        diagnostic.bootstrap_anchor(confirmed=True)
+    assert not policy.audit_path.exists()
+    assert not (tmp_path / "anchor.json").exists()
+
+
+def test_reconcile_updates_only_proven_stale_anchor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    log = AuditLog(policy)
+    log.write({"event": "one"})
+    first = json.loads(policy.audit_path.read_text().splitlines()[0])
+    log.write({"event": "two"})
+    policy.audit_anchor_path.write_text(
+        json.dumps(
+            {"seq": 1, "tip": first["hmac"], "ts": first["ts"]},
+            separators=(",", ":"),
+        )
+        + "\n"
+    )
+    policy.audit_anchor_path.chmod(0o600)
+    before = policy.audit_path.read_bytes()
+    report = AuditLog._for_diagnostics(policy).reconcile_anchor(
+        confirmed=True
+    )
+    assert report.anchor_state is AnchorState.MATCH
+    assert policy.audit_path.read_bytes() == before
