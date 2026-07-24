@@ -6,6 +6,7 @@ import pytest
 
 from aegis.audit_storage import (
     AuditFailureCode,
+    AuditStorage,
     AuditStorageError,
     GENESIS,
     LogState,
@@ -135,3 +136,65 @@ def test_v2_encoding_is_domain_separated_and_unicode_canonical() -> None:
     assert decoded["audit_version"] == 2
     assert decoded["hmac"] == result.hmac
     assert replay_bytes(record, key=TEST_KEY).state is LogState.VALID_V2
+
+
+def test_locked_append_replays_then_writes_v2(tmp_path) -> None:
+    path = tmp_path / "audit.ndjson"
+    legacy, legacy_tip = signed_v1({"event": "legacy"}, seq=1)
+    path.write_bytes(legacy)
+    path.chmod(0o600)
+    audit = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=None
+    )
+    with audit.locked_operation() as held:
+        before = audit.replay_locked(held)
+        appended = audit.append_v2_locked(
+            held, before, {"event": "current"}, ts=2
+        )
+    result = replay_bytes(path.read_bytes(), key=TEST_KEY)
+    assert result.state is LogState.VALID_V1_V2
+    assert appended.seq == 2
+    assert appended.hmac != legacy_tip
+    assert result.tip == appended.hmac
+
+
+def test_append_refuses_reserved_fields_and_unchained_mode(tmp_path) -> None:
+    path = tmp_path / "audit.ndjson"
+    audit = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=None
+    )
+    with audit.locked_operation() as held:
+        replay = audit.replay_locked(held)
+        with pytest.raises(AuditStorageError) as reserved:
+            audit.append_v2_locked(
+                held, replay, {"event": "x", "seq": 99}, ts=1
+            )
+    assert reserved.value.code is AuditFailureCode.INVALID_SCHEMA
+
+    unchained = AuditStorage(
+        path, key=TEST_KEY, chained=False, anchor_path=None
+    )
+    with unchained.locked_operation() as held:
+        replay = unchained.replay_locked(held)
+        with pytest.raises(AuditStorageError) as disabled:
+            unchained.append_v2_locked(
+                held, replay, {"event": "x"}, ts=1
+            )
+    assert disabled.value.code is AuditFailureCode.WRITE_DISABLED
+
+
+def test_locked_replay_refuses_corrupted_history_before_append(tmp_path) -> None:
+    path = tmp_path / "audit.ndjson"
+    record, _ = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    path.write_bytes(replace_json_field(record, "hmac", "0" * 64))
+    path.chmod(0o600)
+    audit = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=None
+    )
+    with audit.locked_operation() as held:
+        with pytest.raises(AuditStorageError) as error:
+            audit.replay_locked(held)
+    assert error.value.code is AuditFailureCode.INVALID_HMAC
+    assert path.read_bytes().count(b"\n") == 1

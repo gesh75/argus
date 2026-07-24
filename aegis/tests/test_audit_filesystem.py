@@ -27,6 +27,20 @@ class CountingIO(_PosixAuditIO):
         super().flock(fd, operation)
 
 
+class ShortWriteIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self.write_calls = 0
+        self.fsync_calls = 0
+
+    def write(self, fd: int, data: bytes) -> int:
+        self.write_calls += 1
+        return super().write(fd, data[:7])
+
+    def fsync(self, fd: int) -> None:
+        self.fsync_calls += 1
+        super().fsync(fd)
+
+
 def storage(path: Path, *, io: _PosixAuditIO | None = None) -> AuditStorage:
     return AuditStorage(
         path,
@@ -103,3 +117,17 @@ def test_existing_file_with_broad_mode_is_rejected(tmp_path: Path) -> None:
         with pytest.raises(AuditStorageError) as error:
             held.audit_parent.open_regular(held.audit_name, os.O_RDONLY)
     assert error.value.code is AuditFailureCode.UNSAFE_MODE
+
+
+def test_append_completes_short_writes_and_fsyncs(tmp_path: Path) -> None:
+    io = ShortWriteIO()
+    path = tmp_path / "audit.ndjson"
+    audit = storage(path, io=io)
+    with audit.locked_operation() as held:
+        replay = audit.replay_locked(held)
+        audit.append_v2_locked(
+            held, replay, {"event": "short-write"}, ts=1
+        )
+    assert io.write_calls > 1
+    assert io.fsync_calls == 1
+    assert stat.S_IMODE(path.stat().st_mode) == FILE_MODE
