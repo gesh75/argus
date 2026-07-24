@@ -23,8 +23,10 @@ from aegis.recon.web import (
 )
 
 
-def _guard():
-    return Guardrail(Policy.load(DEFAULT_POLICY))
+def _guard(tmp_path):
+    policy = Policy.load(DEFAULT_POLICY)
+    object.__setattr__(policy, "audit_path", tmp_path / "audit.ndjson")
+    return Guardrail(policy)
 
 
 class _RedirectHandler(http.server.BaseHTTPRequestHandler):
@@ -168,15 +170,15 @@ def test_generic_200_login_page_is_not_a_false_positive():
     assert not any(".env" in o.detail for o in obs)
 
 
-def test_orchestrator_denies_out_of_scope_target():
-    guard = _guard()
+def test_orchestrator_denies_out_of_scope_target(tmp_path):
+    guard = _guard(tmp_path)
     orch = WebReconOrchestrator(guard, transport=FixtureTransport({}))
     res = orch.run("8.8.8.8")
     assert res.errors and "DENIED" in res.errors[0]
 
 
-def test_orchestrator_in_scope_runs_and_triages():
-    guard = _guard()
+def test_orchestrator_in_scope_runs_and_triages(tmp_path):
+    guard = _guard(tmp_path)
     tx = FixtureTransport({"/.env": HttpResult(200, "SECRET_KEY=topsecret")})
     orch = WebReconOrchestrator(guard, transport=tx)
     res = orch.run("172.30.0.10")
@@ -185,9 +187,9 @@ def test_orchestrator_in_scope_runs_and_triages():
     assert res.findings  # heuristic triage produced at least one finding
 
 
-def test_secret_value_is_redacted_in_stored_observation():
+def test_secret_value_is_redacted_in_stored_observation(tmp_path):
     # Policy redaction patterns should scrub obvious secrets from stored detail/raw.
-    guard = _guard()
+    guard = _guard(tmp_path)
     tx = FixtureTransport({"/.env": HttpResult(200, "AKIAIOSFODNN7EXAMPLE secret")})
     orch = WebReconOrchestrator(guard, transport=tx)
     res = orch.run("172.30.0.10")
