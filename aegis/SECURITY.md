@@ -39,12 +39,17 @@ It is built to be strict by default. This document is the contract.
   when the local provider is selected.
 
 ## 6. Tamper-evident audit
-- Every authorize / exec / deny is written to an **HMAC-SHA256 chained** log.
-- `aegis audit` replays and verifies the chain; any edit/reorder/truncation → `TAMPERED`.
+- Phase 2A uses strict V1/V2 replay and a domain-separated, sequence-bound V2 HMAC.
+- Each outer operation takes one in-process lock and one POSIX `flock`, replays the
+  complete history, appends a complete record, and `fsync`s before returning.
+- `argus audit` is read-only and classifies log and anchor states without constructing
+  the operational guardrail. It never prints records, event values, or HMAC tips.
 - `PENTEST_AUDIT_HMAC_KEY` is **required** — Aegis refuses to run unaudited.
-- Production hardening (documented, not yet wired): move the HMAC key to a separate signer
-  process; make the log OS-append-only (`chattr +a` / WORM) under a different uid; anchor
-  the chain head externally.
+- Audit and optional anchor parents must be pre-provisioned, owned by the Argus uid,
+  and not group/world writable; final files are owner-only `0600`.
+- The local JSON anchor is a consistency check, not an external WORM control.
+- A Phase 1 writer cannot verify V2 signatures and must never open a log containing V2.
+- See `docs/PHASE2A_AUDIT_OPERATIONS.md` for deployment, recovery, and rollback.
 
 ## 7. Budgets & fail-safes
 - Wall-clock + token + dollar ceilings on a monotonic ledger; breach kills the run.
