@@ -182,9 +182,14 @@ def write_anchor_locked(
         )
         _write_all(parent, temp_fd, encoded)
         parent._io.fsync(temp_fd)
+        parent._io.checkpoint(AuditCheckpoint.AFTER_ANCHOR_FILE_FSYNC)
         parent.replace(temp_name, name)
         replaced = True
+        parent._io.checkpoint(AuditCheckpoint.AFTER_ANCHOR_REPLACE)
         parent.fsync()
+        parent._io.checkpoint(
+            AuditCheckpoint.AFTER_ANCHOR_DIRECTORY_FSYNC
+        )
     finally:
         if temp_fd >= 0:
             parent._io.close(temp_fd)

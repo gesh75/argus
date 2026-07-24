@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import os
-import stat
 import json
+import stat
 from pathlib import Path
 
 import pytest
@@ -16,11 +15,11 @@ from aegis.anchor import (
     write_anchor_locked,
 )
 from aegis.audit_storage import (
+    FILE_MODE,
     AnchorState,
     AuditFailureCode,
     AuditStorage,
     AuditStorageError,
-    FILE_MODE,
     replay_bytes,
 )
 from aegis.config import DEFAULT_POLICY, Policy

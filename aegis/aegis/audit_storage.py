@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import hmac
-import errno
-import fcntl
 import json
 import math
 import os
@@ -13,12 +12,17 @@ import re
 import stat
 import threading
 import time
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Iterator, Literal, Protocol, Self, TypeAlias
+from typing import Literal, Protocol, Self
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - supported writers are POSIX only
+    fcntl = None  # type: ignore[assignment]
 
 AUDIT_VERSION = 2
 GENESIS = "genesis"
@@ -27,8 +31,8 @@ LOCK_TIMEOUT_SECONDS = 10.0
 FILE_MODE = 0o600
 RESERVED_FIELDS = frozenset({"audit_version", "seq", "ts", "prev", "hmac"})
 
-JsonScalar: TypeAlias = None | bool | int | float | str
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+type JsonScalar = None | bool | int | float | str
+type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -131,7 +135,7 @@ class V2Record:
     hmac: str
 
 
-VerifiedRecord: TypeAlias = V1Record | V2Record
+type VerifiedRecord = V1Record | V2Record
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +223,8 @@ class _PosixAuditIO:
         return os.fstat(fd)
 
     def flock(self, fd: int, operation: int) -> None:
+        if fcntl is None:
+            raise AuditStorageError(AuditFailureCode.UNSUPPORTED_PLATFORM)
         fcntl.flock(fd, operation)
 
     def monotonic(self) -> float:
@@ -394,6 +400,8 @@ class AuditStorage:
 
     @contextmanager
     def locked_operation(self) -> Iterator[HeldAuditLock]:
+        if fcntl is None:
+            raise AuditStorageError(AuditFailureCode.UNSUPPORTED_PLATFORM)
         try:
             identity = str(self.audit_path.parent.resolve(strict=True) / self.audit_path.name)
         except OSError as exc:
@@ -516,6 +524,7 @@ class AuditStorage:
                     raise AuditStorageError(AuditFailureCode.IO_FAILURE)
                 offset += written
             self._io.fsync(fd)
+            self._io.checkpoint(AuditCheckpoint.AFTER_LOG_FSYNC)
             return result
         except AuditStorageError:
             raise
@@ -778,6 +787,8 @@ def encode_v2_record(
     ts: int | float,
 ) -> tuple[bytes, AppendResult]:
     if RESERVED_FIELDS.intersection(event):
+        raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
+    if any(not isinstance(field, str) for field in event):
         raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
     if not isinstance(seq, int) or isinstance(seq, bool) or seq < 1:
         raise AuditStorageError(AuditFailureCode.INVALID_SEQUENCE)

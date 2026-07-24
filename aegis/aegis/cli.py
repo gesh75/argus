@@ -13,14 +13,16 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
+
 from . import approval, egress, preflight
-from .config import DEFAULT_POLICY, Policy
 from .audit_storage import (
     AnchorState,
     AuditStorageError,
     DiagnosticReport,
     LogState,
 )
+from .config import DEFAULT_POLICY, Policy
 from .guardrail import AuditLog, Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
@@ -235,7 +237,7 @@ def cmd_audit(args) -> int:
         }
         print(f"audit_error={exc.code.value}", file=sys.stderr)
         return 1 if exc.code in integrity_codes else 2
-    except (GuardrailError, OSError, ValueError) as exc:
+    except (GuardrailError, OSError, ValueError, yaml.YAMLError):
         category = (
             "configuration-error"
         )

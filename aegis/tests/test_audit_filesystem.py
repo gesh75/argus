@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 
 from aegis.audit_storage import (
+    FILE_MODE,
     AuditFailureCode,
     AuditStorage,
     AuditStorageError,
-    FILE_MODE,
     _PosixAuditIO,
 )
 from tests.audit_support import TEST_KEY
@@ -39,6 +39,23 @@ class ShortWriteIO(_PosixAuditIO):
     def fsync(self, fd: int) -> None:
         self.fsync_calls += 1
         super().fsync(fd)
+
+
+class ImmediateTimeoutIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        self.now += 11.0
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        del seconds
+
+    def flock(self, fd: int, operation: int) -> None:
+        if operation & fcntl.LOCK_EX:
+            raise BlockingIOError
+        super().flock(fd, operation)
 
 
 def storage(path: Path, *, io: _PosixAuditIO | None = None) -> AuditStorage:
@@ -117,6 +134,14 @@ def test_existing_file_with_broad_mode_is_rejected(tmp_path: Path) -> None:
         with pytest.raises(AuditStorageError) as error:
             held.audit_parent.open_regular(held.audit_name, os.O_RDONLY)
     assert error.value.code is AuditFailureCode.UNSAFE_MODE
+
+
+def test_lock_timeout_uses_fixed_monotonic_deadline(tmp_path: Path) -> None:
+    audit = storage(tmp_path / "audit.ndjson", io=ImmediateTimeoutIO())
+    with pytest.raises(AuditStorageError) as error:
+        with audit.locked_operation():
+            pass
+    assert error.value.code is AuditFailureCode.LOCK_TIMEOUT
 
 
 def test_append_completes_short_writes_and_fsyncs(tmp_path: Path) -> None:

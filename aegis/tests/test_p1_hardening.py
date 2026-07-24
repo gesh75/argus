@@ -1,7 +1,7 @@
 """P1 hardening suite: approval gate (#6), anchoring (#5), egress (#7),
 pre-flight (#8), and audit-key strength (#4)."""
-import os
 import json
+import os
 
 os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 

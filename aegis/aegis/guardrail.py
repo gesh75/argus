@@ -20,7 +20,6 @@ import re
 import time
 from dataclasses import dataclass
 
-from .config import Policy
 from . import anchor
 from .audit_storage import (
     AnchorState,
@@ -32,6 +31,7 @@ from .audit_storage import (
     JsonValue,
     ReplayResult,
 )
+from .config import Policy
 
 _SHELL_METACHARS = re.compile(r"[;&|`$><\n\r\\]|\$\(")
 _DOTTED = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:/(\d{1,2}))?$")
@@ -154,7 +154,8 @@ class AuditLog:
         if self._anchor_path is None:
             return AnchorState.DISABLED
         parent = self._storage.open_anchor_parent_locked(held)
-        assert parent is not None
+        if parent is None:
+            raise AuditStorageError(AuditFailureCode.IO_FAILURE)
         try:
             anchor.cleanup_anchor_temps_locked(
                 held, parent, self._anchor_path.name
@@ -308,7 +309,6 @@ class _DiagnosticAuditLog:
         )
 
     def inspect(self) -> DiagnosticReport:
-        from .audit_storage import LogState
 
         with self._storage.locked_operation() as held:
             try:
@@ -331,7 +331,8 @@ class _DiagnosticAuditLog:
                 anchor_state = AnchorState.DISABLED
             else:
                 parent = self._storage.open_anchor_parent_locked(held)
-                assert parent is not None
+                if parent is None:
+                    raise AuditStorageError(AuditFailureCode.IO_FAILURE)
                 try:
                     read = anchor.read_anchor_locked(
                         held, parent, self._anchor_path.name
@@ -375,7 +376,8 @@ class _DiagnosticAuditLog:
             if replay.count == 0 or replay.final_ts is None:
                 raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
             parent = self._storage.open_anchor_parent_locked(held)
-            assert parent is not None
+            if parent is None:
+                raise AuditStorageError(AuditFailureCode.IO_FAILURE)
             try:
                 anchor.cleanup_anchor_temps_locked(
                     held, parent, self._anchor_path.name

@@ -5,10 +5,10 @@ import json
 import pytest
 
 from aegis.audit_storage import (
+    GENESIS,
     AuditFailureCode,
     AuditStorage,
     AuditStorageError,
-    GENESIS,
     LogState,
     encode_v2_record,
     replay_bytes,
