@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,53 @@ def test_diagnostic_classifies_malformed_without_normal_construction(
     assert report.anchor_state is AnchorState.DISABLED
     assert report.error_code is AuditFailureCode.INVALID_SCHEMA
     assert report.error_record == 1
+
+
+@pytest.mark.parametrize(
+    ("anchor_bytes", "expected"),
+    [
+        (None, AnchorState.MISSING),
+        (b"{broken\\n", AnchorState.MALFORMED),
+        (
+            json.dumps({"seq": 1, "tip": "a" * 64, "ts": 1}).encode()
+            + b"\n",
+            AnchorState.NOT_COMPARABLE,
+        ),
+    ],
+)
+def test_invalid_log_still_inspects_anchor_under_same_operation(
+    tmp_path: Path,
+    monkeypatch,
+    anchor_bytes: bytes | None,
+    expected: AnchorState,
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    policy = Policy.load(policy_file(tmp_path, anchor=True))
+    policy.audit_path.write_bytes(b'{"event":"private"}\n')
+    policy.audit_path.chmod(0o600)
+    if anchor_bytes is not None:
+        policy.audit_anchor_path.write_bytes(anchor_bytes)
+        policy.audit_anchor_path.chmod(0o600)
+    report = AuditLog._for_diagnostics(policy).inspect()
+    assert report.error_code is AuditFailureCode.INVALID_SCHEMA
+    assert report.error_record == 1
+    assert report.anchor_state is expected
+
+
+def test_invalid_log_with_unsafe_anchor_parent_is_operational_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    policy = Policy.load(policy_file(tmp_path))
+    policy.audit_path.write_bytes(b'{"event":"private"}\n')
+    policy.audit_path.chmod(0o600)
+    unsafe = tmp_path / "unsafe-anchor-parent"
+    unsafe.mkdir(mode=0o777)
+    unsafe.chmod(0o777)
+    object.__setattr__(policy, "audit_anchor_path", unsafe / "anchor.json")
+    with pytest.raises(AuditStorageError) as error:
+        AuditLog._for_diagnostics(policy).inspect()
+    assert error.value.code is AuditFailureCode.UNSAFE_MODE
 
 
 def test_cmd_audit_does_not_construct_guardrail(
@@ -128,7 +176,7 @@ def test_cli_bootstrap_requires_confirmation_then_succeeds(
                 "--bootstrap-anchor",
             ]
         )
-        == 2
+        == 1
     )
     assert (
         cli.main(
@@ -141,4 +189,78 @@ def test_cli_bootstrap_requires_confirmation_then_succeeds(
             ]
         )
         == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"{broken\n",
+        b"[]\n",
+        b"\xff\n",
+    ],
+)
+def test_cli_integrity_formats_return_one(
+    tmp_path: Path, monkeypatch, raw: bytes
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    path = policy_file(tmp_path)
+    log_path = tmp_path / "audit.ndjson"
+    log_path.write_bytes(raw)
+    log_path.chmod(0o600)
+    assert (
+        cli.cmd_audit(
+            argparse.Namespace(
+                policy=str(path),
+                bootstrap_anchor=False,
+                reconcile_anchor=False,
+                confirm=False,
+            )
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        AuditFailureCode.LOCK_TIMEOUT,
+        AuditFailureCode.UNSAFE_PARENT,
+        AuditFailureCode.IO_FAILURE,
+    ],
+)
+def test_cli_operational_storage_failures_return_two(
+    tmp_path: Path, monkeypatch, code: AuditFailureCode
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+
+    def fail(_policy):
+        raise AuditStorageError(code)
+
+    monkeypatch.setattr(AuditLog, "_for_diagnostics", fail)
+    assert (
+        cli.cmd_audit(
+            argparse.Namespace(
+                policy=str(policy_file(tmp_path)),
+                bootstrap_anchor=False,
+                reconcile_anchor=False,
+                confirm=False,
+            )
+        )
+        == 2
+    )
+
+
+def test_cli_missing_key_returns_two(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("PENTEST_AUDIT_HMAC_KEY", raising=False)
+    assert (
+        cli.cmd_audit(
+            argparse.Namespace(
+                policy=str(policy_file(tmp_path)),
+                bootstrap_anchor=False,
+                reconcile_anchor=False,
+                confirm=False,
+            )
+        )
+        == 2
     )

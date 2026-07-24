@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from aegis.audit_storage import (
     AuditFailureCode,
     AuditStorage,
     AuditStorageError,
+    _PosixAuditIO,
     replay_bytes,
 )
 from aegis.config import DEFAULT_POLICY, Policy
@@ -139,15 +141,18 @@ def test_strict_anchor_read_classifies_malformed(tmp_path: Path) -> None:
             parent.close()
 
 
-def test_cleanup_removes_only_owned_regular_anchor_temps(tmp_path: Path) -> None:
-    removable = tmp_path / ".anchor.json.tmp.safe"
+def test_cleanup_removes_only_exact_owned_regular_anchor_temps(
+    tmp_path: Path,
+) -> None:
+    removable = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'a' * 16}"
     removable.write_bytes(b"x")
     removable.chmod(0o600)
+    invalid_prefix = tmp_path / ".anchor.json.tmp.safe"
+    invalid_prefix.write_bytes(b"x")
+    invalid_prefix.chmod(0o600)
     unrelated = tmp_path / ".other.tmp.safe"
     unrelated.write_bytes(b"x")
     unrelated.chmod(0o600)
-    directory = tmp_path / ".anchor.json.tmp.directory"
-    directory.mkdir()
     storage = AuditStorage(
         tmp_path / "audit.ndjson",
         key=TEST_KEY,
@@ -162,8 +167,185 @@ def test_cleanup_removes_only_owned_regular_anchor_temps(tmp_path: Path) -> None
         finally:
             parent.close()
     assert not removable.exists()
+    assert invalid_prefix.exists()
     assert unrelated.exists()
-    assert directory.is_dir()
+
+
+@pytest.mark.parametrize("unsafe_kind", ["directory", "symlink", "mode"])
+def test_matching_unsafe_abandoned_temp_fails_closed(
+    tmp_path: Path, unsafe_kind: str
+) -> None:
+    candidate = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'b' * 16}"
+    if unsafe_kind == "directory":
+        candidate.mkdir()
+    elif unsafe_kind == "symlink":
+        target = tmp_path / "target"
+        target.write_bytes(b"x")
+        target.chmod(0o600)
+        candidate.symlink_to(target)
+    else:
+        candidate.write_bytes(b"x")
+        candidate.chmod(0o640)
+    storage = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=tmp_path / "anchor.json",
+    )
+    with storage.locked_operation() as held:
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            with pytest.raises(AuditStorageError):
+                cleanup_anchor_temps_locked(held, parent, "anchor.json")
+        finally:
+            parent.close()
+    assert candidate.exists() or candidate.is_symlink()
+
+
+class _FailTempUnlinkIO(_PosixAuditIO):
+    def unlink(self, name: str, *, dir_fd: int) -> None:
+        if name.startswith(".anchor.json.tmp."):
+            raise PermissionError("injected unlink failure")
+        super().unlink(name, dir_fd=dir_fd)
+
+
+class _FailAnchorWriteAndUnlinkIO(_FailTempUnlinkIO):
+    def write(self, fd: int, data: bytes) -> int:
+        del fd, data
+        raise OSError("injected write failure")
+
+
+class _ForeignTempOwnerIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self._foreign_fds: set[int] = set()
+
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        fd = super().open(path, flags, mode, dir_fd=dir_fd)
+        if path.startswith(".anchor.json.tmp."):
+            self._foreign_fds.add(fd)
+        return fd
+
+    def fstat(self, fd: int) -> os.stat_result:
+        metadata = super().fstat(fd)
+        if fd not in self._foreign_fds:
+            return metadata
+        values = list(metadata)
+        values[4] = metadata.st_uid + 1
+        return os.stat_result(values)
+
+    def close(self, fd: int) -> None:
+        self._foreign_fds.discard(fd)
+        super().close(fd)
+
+
+def test_matching_wrong_owner_abandoned_temp_fails_closed(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'e' * 16}"
+    candidate.write_bytes(b"x")
+    candidate.chmod(0o600)
+    storage = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=tmp_path / "anchor.json",
+        _io=_ForeignTempOwnerIO(),
+    )
+    with storage.locked_operation() as held:
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            with pytest.raises(AuditStorageError) as error:
+                cleanup_anchor_temps_locked(held, parent, "anchor.json")
+        finally:
+            parent.close()
+    assert error.value.code is AuditFailureCode.UNSAFE_OWNER
+    assert candidate.exists()
+
+
+def test_matching_temp_unlink_failure_is_propagated(tmp_path: Path) -> None:
+    candidate = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'c' * 16}"
+    candidate.write_bytes(b"x")
+    candidate.chmod(0o600)
+    storage = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=tmp_path / "anchor.json",
+        _io=_FailTempUnlinkIO(),
+    )
+    with storage.locked_operation() as held:
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            with pytest.raises(AuditStorageError) as error:
+                cleanup_anchor_temps_locked(held, parent, "anchor.json")
+        finally:
+            parent.close()
+    assert error.value.code is AuditFailureCode.IO_FAILURE
+    assert candidate.exists()
+
+
+def test_anchor_write_preserves_primary_and_reports_cleanup_failure(
+    tmp_path: Path,
+) -> None:
+    storage = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=tmp_path / "anchor.json",
+        _io=_FailAnchorWriteAndUnlinkIO(),
+    )
+    with storage.locked_operation() as held:
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            with pytest.raises(AuditStorageError) as error:
+                write_anchor_locked(
+                    held,
+                    parent,
+                    "anchor.json",
+                    AnchorRecord(1, "a" * 64, 1),
+                )
+        finally:
+            parent.close()
+    assert error.value.code is AuditFailureCode.IO_FAILURE
+    assert error.value.cleanup_code is AuditFailureCode.IO_FAILURE
+    assert str(error.value) == "io-failure; cleanup=io-failure"
+
+
+def test_abandoned_valid_temp_is_cleaned_before_normal_admission(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    candidate = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'d' * 16}"
+    candidate.write_bytes(b"x")
+    candidate.chmod(0o600)
+    AuditLog(policy)
+    assert not candidate.exists()
+
+
+def test_bootstrap_does_not_suppress_unsafe_temp_cleanup(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    object.__setattr__(policy, "audit_anchor_path", None)
+    AuditLog(policy).write({"event": "one"})
+    object.__setattr__(policy, "audit_anchor_path", tmp_path / "anchor.json")
+    candidate = tmp_path / f".anchor.json.tmp.{os.getpid()}.{'f' * 16}"
+    candidate.mkdir()
+    with pytest.raises(AuditStorageError) as error:
+        AuditLog._for_diagnostics(policy).bootstrap_anchor(confirmed=True)
+    assert error.value.code is AuditFailureCode.NON_REGULAR_FILE
+    assert candidate.is_dir()
 
 
 def diagnostic_policy(tmp_path: Path, monkeypatch) -> Policy:
