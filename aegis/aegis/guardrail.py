@@ -353,6 +353,69 @@ class _DiagnosticAuditLog:
         del event
         raise AuditStorageError(AuditFailureCode.WRITE_DISABLED)
 
+    def bootstrap_anchor(self, *, confirmed: bool) -> DiagnosticReport:
+        return self._recover_anchor(
+            confirmed=confirmed, required_state=AnchorState.MISSING
+        )
+
+    def reconcile_anchor(self, *, confirmed: bool) -> DiagnosticReport:
+        return self._recover_anchor(
+            confirmed=confirmed, required_state=AnchorState.STALE
+        )
+
+    def _recover_anchor(
+        self, *, confirmed: bool, required_state: AnchorState
+    ) -> DiagnosticReport:
+        if not confirmed:
+            raise AuditStorageError(AuditFailureCode.WRITE_DISABLED)
+        if self._anchor_path is None:
+            raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
+        with self._storage.locked_operation() as held:
+            replay = self._storage.replay_locked(held)
+            if replay.count == 0 or replay.final_ts is None:
+                raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
+            parent = self._storage.open_anchor_parent_locked(held)
+            assert parent is not None
+            try:
+                anchor.cleanup_anchor_temps_locked(
+                    held, parent, self._anchor_path.name
+                )
+                read = anchor.read_anchor_locked(
+                    held, parent, self._anchor_path.name
+                )
+                state = anchor.classify_anchor(
+                    replay, read, configured=True
+                )
+                if state is not required_state:
+                    raise AuditStorageError(_anchor_failure_code(state))
+                anchor.write_anchor_locked(
+                    held,
+                    parent,
+                    self._anchor_path.name,
+                    anchor.AnchorRecord(
+                        replay.count, replay.tip, replay.final_ts
+                    ),
+                )
+                final_read = anchor.read_anchor_locked(
+                    held, parent, self._anchor_path.name
+                )
+                final_state = anchor.classify_anchor(
+                    replay, final_read, configured=True
+                )
+                if final_state is not AnchorState.MATCH:
+                    raise AuditStorageError(
+                        _anchor_failure_code(final_state)
+                    )
+                return DiagnosticReport(
+                    log_state=replay.state,
+                    anchor_state=final_state,
+                    record_count=replay.count,
+                    error_code=None,
+                    error_record=None,
+                )
+            finally:
+                parent.close()
+
 
 class Budget:
     """Wall-clock + token + dollar ceilings. Breach => GuardrailError. Monotonic ledger."""

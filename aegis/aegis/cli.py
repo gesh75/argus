@@ -208,12 +208,36 @@ def cmd_agent(args) -> int:
 def cmd_audit(args) -> int:
     try:
         diagnostic = AuditLog._for_diagnostics(Policy.load(args.policy))
-        report = diagnostic.inspect()
-    except (AuditStorageError, GuardrailError, OSError, ValueError) as exc:
+        if args.bootstrap_anchor or args.reconcile_anchor:
+            if not args.confirm:
+                print(
+                    "audit_error=confirmation-required", file=sys.stderr
+                )
+                return 2
+            report = (
+                diagnostic.bootstrap_anchor(confirmed=True)
+                if args.bootstrap_anchor
+                else diagnostic.reconcile_anchor(confirmed=True)
+            )
+        else:
+            report = diagnostic.inspect()
+    except AuditStorageError as exc:
+        integrity_codes = {
+            code
+            for code in type(exc.code)
+            if code.value.startswith("anchor-")
+            or code.value.startswith("invalid-")
+            or code.value in {
+                "malformed-json",
+                "duplicate-key",
+                "unterminated-record",
+            }
+        }
+        print(f"audit_error={exc.code.value}", file=sys.stderr)
+        return 1 if exc.code in integrity_codes else 2
+    except (GuardrailError, OSError, ValueError) as exc:
         category = (
-            exc.code.value
-            if isinstance(exc, AuditStorageError)
-            else "configuration-error"
+            "configuration-error"
         )
         print(f"audit_error={category}", file=sys.stderr)
         return 2
