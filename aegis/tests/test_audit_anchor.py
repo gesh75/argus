@@ -216,6 +216,69 @@ class _FailAnchorWriteAndUnlinkIO(_FailTempUnlinkIO):
         raise OSError("injected write failure")
 
 
+class _FailAnchorReplaceIO(_PosixAuditIO):
+    def replace(
+        self,
+        source: str,
+        destination: str,
+        *,
+        source_dir_fd: int,
+        destination_dir_fd: int,
+    ) -> None:
+        del source, destination, source_dir_fd, destination_dir_fd
+        raise OSError("injected anchor replace failure")
+
+
+class _RecordingAnchorIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self.temp_fds: set[int] = set()
+        self.events: list[str] = []
+
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        fd = super().open(path, flags, mode, dir_fd=dir_fd)
+        if ".tmp." in path:
+            self.temp_fds.add(fd)
+        return fd
+
+    def write(self, fd: int, data: bytes) -> int:
+        if fd in self.temp_fds and "write" not in self.events:
+            self.events.append("write")
+        return super().write(fd, data)
+
+    def fsync(self, fd: int) -> None:
+        self.events.append(
+            "file-fsync" if fd in self.temp_fds else "directory-fsync"
+        )
+        super().fsync(fd)
+
+    def replace(
+        self,
+        source: str,
+        destination: str,
+        *,
+        source_dir_fd: int,
+        destination_dir_fd: int,
+    ) -> None:
+        self.events.append("replace")
+        super().replace(
+            source,
+            destination,
+            source_dir_fd=source_dir_fd,
+            destination_dir_fd=destination_dir_fd,
+        )
+
+    def close(self, fd: int) -> None:
+        self.temp_fds.discard(fd)
+        super().close(fd)
+
+
 class _ForeignTempOwnerIO(_PosixAuditIO):
     def __init__(self) -> None:
         self._foreign_fds: set[int] = set()
@@ -322,6 +385,100 @@ def test_anchor_write_preserves_primary_and_reports_cleanup_failure(
     assert str(error.value) == "io-failure; cleanup=io-failure"
 
 
+def test_atomic_anchor_write_orders_file_and_directory_fsync(
+    tmp_path: Path,
+) -> None:
+    io = _RecordingAnchorIO()
+    storage = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=tmp_path / "anchor.json",
+        _io=io,
+    )
+    with storage.locked_operation() as held:
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            write_anchor_locked(
+                held,
+                parent,
+                "anchor.json",
+                AnchorRecord(1, "a" * 64, 1),
+            )
+        finally:
+            parent.close()
+    assert io.events == [
+        "write",
+        "file-fsync",
+        "replace",
+        "directory-fsync",
+    ]
+
+
+def test_anchor_write_failure_leaves_recoverable_stale_state(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "audit.ndjson"
+    anchor_path = tmp_path / "anchor.json"
+    normal = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=anchor_path
+    )
+    with normal.locked_operation() as held:
+        replay = normal.replay_locked(held)
+        first = normal.append_v2_locked(
+            held, replay, {"event": "one"}, ts=1
+        )
+        parent = normal.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            write_anchor_locked(
+                held,
+                parent,
+                anchor_path.name,
+                AnchorRecord(first.seq, first.hmac, first.ts),
+            )
+        finally:
+            parent.close()
+    failing = AuditStorage(
+        path,
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=anchor_path,
+        _io=_FailAnchorReplaceIO(),
+    )
+    with failing.locked_operation() as held:
+        replay = failing.replay_locked(held)
+        second = failing.append_v2_locked(
+            held, replay, {"event": "two"}, ts=2
+        )
+        parent = failing.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            with pytest.raises(AuditStorageError) as error:
+                write_anchor_locked(
+                    held,
+                    parent,
+                    anchor_path.name,
+                    AnchorRecord(second.seq, second.hmac, second.ts),
+                )
+        finally:
+            parent.close()
+    assert error.value.code is AuditFailureCode.IO_FAILURE
+    with normal.locked_operation() as held:
+        replay = normal.replay_locked(held)
+        parent = normal.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            read = read_anchor_locked(held, parent, anchor_path.name)
+            assert (
+                classify_anchor(replay, read, configured=True)
+                is AnchorState.STALE
+            )
+        finally:
+            parent.close()
+
+
 def test_abandoned_valid_temp_is_cleaned_before_normal_admission(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -406,4 +563,37 @@ def test_reconcile_updates_only_proven_stale_anchor(
         confirmed=True
     )
     assert report.anchor_state is AnchorState.MATCH
+    assert policy.audit_path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "state", ["missing", "malformed", "ahead", "divergent", "match"]
+)
+def test_reconciliation_refuses_other_states(
+    tmp_path: Path, monkeypatch, state: str
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    log = AuditLog(policy)
+    log.write({"event": "one"})
+    record = json.loads(policy.audit_path.read_text())
+    if state == "missing":
+        policy.audit_anchor_path.unlink()
+    elif state == "malformed":
+        policy.audit_anchor_path.write_bytes(b"{broken\n")
+    elif state == "ahead":
+        policy.audit_anchor_path.write_text(
+            json.dumps({"seq": 2, "tip": "a" * 64, "ts": 2}) + "\n"
+        )
+    elif state == "divergent":
+        policy.audit_anchor_path.write_text(
+            json.dumps(
+                {"seq": 1, "tip": "a" * 64, "ts": record["ts"]}
+            )
+            + "\n"
+        )
+    if policy.audit_anchor_path.exists():
+        policy.audit_anchor_path.chmod(0o600)
+    before = policy.audit_path.read_bytes()
+    with pytest.raises(AuditStorageError):
+        AuditLog._for_diagnostics(policy).reconcile_anchor(confirmed=True)
     assert policy.audit_path.read_bytes() == before

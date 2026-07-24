@@ -61,6 +61,55 @@ def append_worker(path: str, count: int, worker_id: int) -> None:
             )
 
 
+def anchored_append_worker(
+    path: str, anchor_path: str, count: int, worker_id: int
+) -> None:
+    from aegis import anchor
+    from aegis.audit_storage import AnchorState, AuditStorage
+
+    storage = AuditStorage(
+        Path(path),
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=Path(anchor_path),
+    )
+    for index in range(count):
+        with storage.locked_operation() as held:
+            replay = storage.replay_locked(held)
+            parent = storage.open_anchor_parent_locked(held)
+            assert parent is not None
+            try:
+                anchor.cleanup_anchor_temps_locked(
+                    held, parent, Path(anchor_path).name
+                )
+                read = anchor.read_anchor_locked(
+                    held, parent, Path(anchor_path).name
+                )
+                state = anchor.classify_anchor(
+                    replay, read, configured=True
+                )
+                assert state in {
+                    AnchorState.UNINITIALIZED,
+                    AnchorState.MATCH,
+                }
+                result = storage.append_v2_locked(
+                    held,
+                    replay,
+                    {"event": f"worker-{worker_id}-{index}"},
+                    ts=worker_id * 10_000 + index,
+                )
+                anchor.write_anchor_locked(
+                    held,
+                    parent,
+                    Path(anchor_path).name,
+                    anchor.AnchorRecord(
+                        result.seq, result.hmac, result.ts
+                    ),
+                )
+            finally:
+                parent.close()
+
+
 def partial_write_worker(path: str) -> None:
     from aegis.audit_storage import AuditStorage, _PosixAuditIO
 

@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from . import anchor
 from .audit_storage import (
+    INTEGRITY_FAILURE_CODES,
     AnchorState,
     AuditFailureCode,
     AuditStorage,
@@ -252,21 +253,6 @@ def _anchor_failure_code(state: AnchorState) -> AuditFailureCode:
     return mapping.get(state, AuditFailureCode.INVALID_SCHEMA)
 
 
-_INTEGRITY_FAILURES = {
-    AuditFailureCode.MALFORMED_JSON,
-    AuditFailureCode.DUPLICATE_KEY,
-    AuditFailureCode.INVALID_UTF8,
-    AuditFailureCode.NON_OBJECT_JSON,
-    AuditFailureCode.INVALID_SCHEMA,
-    AuditFailureCode.INVALID_VERSION,
-    AuditFailureCode.INVALID_SEQUENCE,
-    AuditFailureCode.INVALID_PREV,
-    AuditFailureCode.INVALID_HMAC,
-    AuditFailureCode.INVALID_TIMESTAMP,
-    AuditFailureCode.UNTERMINATED_RECORD,
-}
-
-
 def _log_state_for_failure(code: AuditFailureCode):
     from .audit_storage import LogState
 
@@ -314,15 +300,31 @@ class _DiagnosticAuditLog:
             try:
                 replay = self._storage.replay_locked(held)
             except AuditStorageError as exc:
-                if exc.code not in _INTEGRITY_FAILURES:
+                if exc.code not in INTEGRITY_FAILURE_CODES:
                     raise
+                if self._anchor_path is None:
+                    anchor_state = AnchorState.DISABLED
+                else:
+                    parent = self._storage.open_anchor_parent_locked(held)
+                    if parent is None:
+                        raise AuditStorageError(
+                            AuditFailureCode.IO_FAILURE
+                        ) from exc
+                    try:
+                        read = anchor.read_anchor_locked(
+                            held, parent, self._anchor_path.name
+                        )
+                        if read.state is AnchorState.MALFORMED:
+                            anchor_state = AnchorState.MALFORMED
+                        elif read.record is None:
+                            anchor_state = AnchorState.MISSING
+                        else:
+                            anchor_state = AnchorState.NOT_COMPARABLE
+                    finally:
+                        parent.close()
                 return DiagnosticReport(
                     log_state=_log_state_for_failure(exc.code),
-                    anchor_state=(
-                        AnchorState.DISABLED
-                        if self._anchor_path is None
-                        else AnchorState.NOT_COMPARABLE
-                    ),
+                    anchor_state=anchor_state,
                     record_count=max(0, (exc.record_number or 1) - 1),
                     error_code=exc.code,
                     error_record=exc.record_number,

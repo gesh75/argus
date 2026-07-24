@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+from pathlib import Path
 
 import pytest
 
@@ -10,10 +12,13 @@ from aegis.audit_storage import (
     AuditStorage,
     AuditStorageError,
     LogState,
+    decode_v2_record,
     encode_v2_record,
     replay_bytes,
     strict_json_object,
 )
+from aegis.config import DEFAULT_POLICY, Policy
+from aegis.guardrail import AuditLog
 from tests.audit_support import TEST_KEY, replace_json_field, signed_v1
 
 
@@ -198,3 +203,128 @@ def test_locked_replay_refuses_corrupted_history_before_append(tmp_path) -> None
             audit.replay_locked(held)
     assert error.value.code is AuditFailureCode.INVALID_HMAC
     assert path.read_bytes().count(b"\n") == 1
+
+
+def test_malformed_json_in_middle_rejected() -> None:
+    first, append = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    third, _ = encode_v2_record(
+        {"event": "three"}, key=TEST_KEY, seq=3, prev=append.hmac, ts=3
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(first + b"{broken\n" + third, key=TEST_KEY)
+    assert error.value.code is AuditFailureCode.MALFORMED_JSON
+    assert error.value.record_number == 2
+
+
+def test_missing_hmac_rejected() -> None:
+    record, _ = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    data = json.loads(record)
+    del data["hmac"]
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(json.dumps(data).encode() + b"\n", key=TEST_KEY)
+    assert error.value.code is AuditFailureCode.INVALID_SCHEMA
+
+
+@pytest.mark.parametrize(
+    ("sequences", "expected"),
+    [
+        ((1, 1), AuditFailureCode.INVALID_SEQUENCE),
+        ((1, 3), AuditFailureCode.INVALID_SEQUENCE),
+        ((2, 1), AuditFailureCode.INVALID_SEQUENCE),
+    ],
+)
+def test_sequence_corruption_is_rejected(
+    sequences: tuple[int, int], expected: AuditFailureCode
+) -> None:
+    first, append = encode_v2_record(
+        {"event": "one"},
+        key=TEST_KEY,
+        seq=sequences[0],
+        prev=GENESIS,
+        ts=1,
+    )
+    second, _ = encode_v2_record(
+        {"event": "two"},
+        key=TEST_KEY,
+        seq=sequences[1],
+        prev=append.hmac,
+        ts=2,
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(first + second, key=TEST_KEY)
+    assert error.value.code is expected
+
+
+@pytest.mark.parametrize("bad_hmac", ["a" * 63, "A" * 64, "z" * 64, 7])
+def test_invalid_hmac_encodings_are_rejected(bad_hmac: object) -> None:
+    record, _ = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(
+            replace_json_field(record, "hmac", bad_hmac), key=TEST_KEY
+        )
+    assert error.value.code is AuditFailureCode.INVALID_HMAC
+
+
+def test_nonfinite_timestamp_is_rejected() -> None:
+    data = {
+        "audit_version": 2,
+        "seq": 1,
+        "ts": math.inf,
+        "prev": GENESIS,
+        "event": "one",
+        "hmac": "a" * 64,
+    }
+    with pytest.raises(AuditStorageError) as error:
+        decode_v2_record(data, expected_seq=1)
+    assert error.value.code is AuditFailureCode.INVALID_TIMESTAMP
+
+
+def test_sensitive_values_never_appear_in_errors() -> None:
+    sensitive_value = "operator-token-should-never-leak"
+    raw = json.dumps({"event": sensitive_value}).encode() + b"\n"
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(raw, key=TEST_KEY)
+    assert str(error.value) == "invalid-schema at record 1"
+    assert sensitive_value not in str(error.value)
+
+
+def _audit_policy(tmp_path: Path, monkeypatch) -> Policy:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    policy = Policy.load(DEFAULT_POLICY)
+    object.__setattr__(policy, "audit_path", tmp_path / "audit.ndjson")
+    object.__setattr__(policy, "audit_anchor_path", tmp_path / "anchor.json")
+    return policy
+
+
+def test_write_returns_committed_hmac(tmp_path: Path, monkeypatch) -> None:
+    result = AuditLog(_audit_policy(tmp_path, monkeypatch)).write(
+        {"event": "one"}
+    )
+    assert len(result) == 64
+    assert all(character in "0123456789abcdef" for character in result)
+
+
+def test_verify_returns_boolean(tmp_path: Path, monkeypatch) -> None:
+    log = AuditLog(_audit_policy(tmp_path, monkeypatch))
+    log.write({"event": "one"})
+    assert log.verify() is True
+    log._path.write_bytes(b"{broken\n")
+    assert log.verify() is False
+
+
+def test_cross_check_anchor_retains_tuple_shape(
+    tmp_path: Path, monkeypatch
+) -> None:
+    log = AuditLog(_audit_policy(tmp_path, monkeypatch))
+    log.write({"event": "one"})
+    result = log.cross_check_anchor()
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result[0] is True
+    assert isinstance(result[1], str)

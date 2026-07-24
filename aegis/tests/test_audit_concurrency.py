@@ -16,6 +16,7 @@ from aegis.audit_storage import (
 )
 from tests.audit_support import (
     TEST_KEY,
+    anchored_append_worker,
     append_worker,
     checkpoint_worker,
     partial_write_worker,
@@ -112,6 +113,78 @@ def test_exit_after_anchor_file_fsync_leaves_stale_anchor(
                 anchor_path.name,
                 anchor.AnchorRecord(first.seq, first.hmac, first.ts),
             )
+        finally:
+            parent.close()
+
+
+def test_crash_after_anchor_directory_fsync_is_committed(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "audit.ndjson"
+    anchor_path = tmp_path / "anchor.json"
+    process = spawned(
+        checkpoint_worker,
+        str(path),
+        str(anchor_path),
+        AuditCheckpoint.AFTER_ANCHOR_DIRECTORY_FSYNC.value,
+    )
+    assert process.exitcode == 77
+    storage = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=anchor_path
+    )
+    with storage.locked_operation() as held:
+        replay = storage.replay_locked(held)
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            read = anchor.read_anchor_locked(
+                held, parent, anchor_path.name
+            )
+            assert replay.count == 1
+            assert (
+                anchor.classify_anchor(replay, read, configured=True)
+                is AnchorState.MATCH
+            )
+        finally:
+            parent.close()
+
+
+@pytest.mark.parametrize("round_number", range(3))
+def test_stress_anchor_matches_final_tip(
+    tmp_path: Path, round_number: int
+) -> None:
+    path = tmp_path / f"audit-anchored-{round_number}.ndjson"
+    anchor_path = tmp_path / f"anchor-{round_number}.json"
+    context = multiprocessing.get_context("spawn")
+    workers = [
+        context.Process(
+            target=anchored_append_worker,
+            args=(str(path), str(anchor_path), 20, worker),
+        )
+        for worker in range(6)
+    ]
+    for process in workers:
+        process.start()
+    for process in workers:
+        process.join(30)
+        assert process.exitcode == 0
+    storage = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=anchor_path
+    )
+    with storage.locked_operation() as held:
+        replay = storage.replay_locked(held)
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            read = anchor.read_anchor_locked(
+                held, parent, anchor_path.name
+            )
+            assert replay.count == 120
+            assert len({record.event for record in replay.records}) == 120
+            assert read.record is not None
+            assert read.record.seq == replay.count
+            assert read.record.tip == replay.tip
+            assert read.record.ts == replay.final_ts
         finally:
             parent.close()
 

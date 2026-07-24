@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import fcntl
 import errno
+import fcntl
 import os
 import stat
 import threading
@@ -93,6 +93,53 @@ class InterruptingIO(_PosixAuditIO):
         super().flock(fd, operation)
 
 
+class ForeignAuditOwnerIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self.foreign_fds: set[int] = set()
+
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        fd = super().open(path, flags, mode, dir_fd=dir_fd)
+        if path == "audit.ndjson":
+            self.foreign_fds.add(fd)
+        return fd
+
+    def fstat(self, fd: int) -> os.stat_result:
+        metadata = super().fstat(fd)
+        if fd not in self.foreign_fds:
+            return metadata
+        values = list(metadata)
+        values[4] = metadata.st_uid + 1
+        return os.stat_result(values)
+
+    def close(self, fd: int) -> None:
+        self.foreign_fds.discard(fd)
+        super().close(fd)
+
+
+class CreateModeIO(_PosixAuditIO):
+    def __init__(self) -> None:
+        self.created_modes: dict[str, int] = {}
+
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if flags & os.O_CREAT:
+            self.created_modes[path] = mode
+        return super().open(path, flags, mode, dir_fd=dir_fd)
+
+
 def storage(path: Path, *, io: _PosixAuditIO | None = None) -> AuditStorage:
     return AuditStorage(
         path,
@@ -182,6 +229,64 @@ def test_existing_file_with_broad_mode_is_rejected(tmp_path: Path) -> None:
     assert error.value.code is AuditFailureCode.UNSAFE_MODE
 
 
+def test_unsafe_owner_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "audit.ndjson"
+    path.write_bytes(b"")
+    path.chmod(0o600)
+    audit = storage(path, io=ForeignAuditOwnerIO())
+    with audit.locked_operation() as held:
+        with pytest.raises(AuditStorageError) as error:
+            audit.replay_locked(held)
+    assert error.value.code is AuditFailureCode.UNSAFE_OWNER
+
+
+def test_unsupported_platform_fails_closed(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import aegis.audit_storage as audit_storage
+
+    monkeypatch.setattr(audit_storage, "fcntl", None)
+    with pytest.raises(AuditStorageError) as error:
+        with storage(tmp_path / "audit.ndjson").locked_operation():
+            pass
+    assert error.value.code is AuditFailureCode.UNSUPPORTED_PLATFORM
+
+
+def test_new_files_use_mode_0600(tmp_path: Path) -> None:
+    from aegis import anchor
+
+    io = CreateModeIO()
+    anchor_path = tmp_path / "anchor.json"
+    audit = AuditStorage(
+        tmp_path / "audit.ndjson",
+        key=TEST_KEY,
+        chained=True,
+        anchor_path=anchor_path,
+        _io=io,
+    )
+    with audit.locked_operation() as held:
+        replay = audit.replay_locked(held)
+        appended = audit.append_v2_locked(
+            held, replay, {"event": "one"}, ts=1
+        )
+        parent = audit.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            anchor.write_anchor_locked(
+                held,
+                parent,
+                anchor_path.name,
+                anchor.AnchorRecord(
+                    appended.seq, appended.hmac, appended.ts
+                ),
+            )
+        finally:
+            parent.close()
+    assert io.created_modes
+    assert set(io.created_modes.values()) == {FILE_MODE}
+    assert any(".tmp." in name for name in io.created_modes)
+
+
 def test_lock_timeout_uses_fixed_monotonic_deadline(tmp_path: Path) -> None:
     audit = storage(tmp_path / "audit.ndjson", io=ImmediateTimeoutIO())
     with pytest.raises(AuditStorageError) as error:
@@ -238,7 +343,7 @@ def test_repeated_flock_eintr_honors_fixed_deadline(tmp_path: Path) -> None:
             pass
     assert error.value.code is AuditFailureCode.LOCK_TIMEOUT
     assert io.now == 10.0
-    assert io.exclusive_attempts == 3
+    assert io.exclusive_attempts == 2
 
 
 def test_append_completes_short_writes_and_fsyncs(tmp_path: Path) -> None:

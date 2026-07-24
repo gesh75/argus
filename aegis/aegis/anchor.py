@@ -18,6 +18,7 @@ from .audit_storage import (
     FILE_MODE,
     AnchorState,
     AuditCheckpoint,
+    AuditFailureCode,
     AuditStorageError,
     HeldAuditLock,
     LogState,
@@ -166,6 +167,7 @@ def write_anchor_locked(
     temp_name = f".{name}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
     temp_fd = -1
     replaced = False
+    primary_error: AuditStorageError | None = None
     try:
         temp_fd = parent.open_regular(
             temp_name,
@@ -190,14 +192,45 @@ def write_anchor_locked(
         parent._io.checkpoint(
             AuditCheckpoint.AFTER_ANCHOR_DIRECTORY_FSYNC
         )
+    except AuditStorageError as exc:
+        primary_error = exc
+    except OSError as exc:
+        primary_error = AuditStorageError(AuditFailureCode.IO_FAILURE)
+        primary_error.__cause__ = exc
     finally:
         if temp_fd >= 0:
-            parent._io.close(temp_fd)
-        if not replaced:
             try:
-                parent.unlink_regular(temp_name)
-            except (AuditStorageError, FileNotFoundError, OSError):
-                pass
+                parent._io.close(temp_fd)
+            except OSError as exc:
+                if primary_error is None:
+                    primary_error = AuditStorageError(
+                        AuditFailureCode.IO_FAILURE
+                    )
+                    primary_error.__cause__ = exc
+    cleanup_error: AuditStorageError | None = None
+    if not replaced:
+        try:
+            parent.unlink_regular(temp_name)
+        except AuditStorageError as exc:
+            if not isinstance(exc.__cause__, FileNotFoundError):
+                cleanup_error = exc
+        except OSError as exc:
+            cleanup_error = AuditStorageError(AuditFailureCode.IO_FAILURE)
+            cleanup_error.__cause__ = exc
+    if primary_error is not None:
+        if cleanup_error is not None:
+            primary_error.cleanup_code = cleanup_error.code
+            primary_error.args = (str(primary_error),)
+            raise primary_error from cleanup_error
+        raise primary_error
+    if cleanup_error is not None:
+        raise cleanup_error
+
+
+def _anchor_temp_pattern(anchor_name: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"^\.{re.escape(anchor_name)}\.tmp\.[1-9][0-9]*\.[0-9a-f]{{16}}$"
+    )
 
 
 def cleanup_anchor_temps_locked(
@@ -206,11 +239,17 @@ def cleanup_anchor_temps_locked(
     anchor_name: str,
 ) -> None:
     held.assert_held()
-    prefix = f".{anchor_name}.tmp."
-    for candidate in parent._io.listdir(parent.fd):
-        if not candidate.startswith(prefix):
+    pattern = _anchor_temp_pattern(anchor_name)
+    try:
+        candidates = parent._io.listdir(parent.fd)
+    except OSError as exc:
+        raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
+    for candidate in candidates:
+        if pattern.fullmatch(candidate) is None:
             continue
         try:
             parent.unlink_regular(candidate)
-        except (AuditStorageError, FileNotFoundError, OSError):
-            continue
+        except AuditStorageError:
+            raise
+        except OSError as exc:
+            raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc

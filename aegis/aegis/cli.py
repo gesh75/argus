@@ -17,6 +17,7 @@ import yaml
 
 from . import approval, egress, preflight
 from .audit_storage import (
+    INTEGRITY_FAILURE_CODES,
     AnchorState,
     AuditStorageError,
     DiagnosticReport,
@@ -215,7 +216,7 @@ def cmd_audit(args) -> int:
                 print(
                     "audit_error=confirmation-required", file=sys.stderr
                 )
-                return 2
+                return 1
             report = (
                 diagnostic.bootstrap_anchor(confirmed=True)
                 if args.bootstrap_anchor
@@ -224,19 +225,8 @@ def cmd_audit(args) -> int:
         else:
             report = diagnostic.inspect()
     except AuditStorageError as exc:
-        integrity_codes = {
-            code
-            for code in type(exc.code)
-            if code.value.startswith("anchor-")
-            or code.value.startswith("invalid-")
-            or code.value in {
-                "malformed-json",
-                "duplicate-key",
-                "unterminated-record",
-            }
-        }
         print(f"audit_error={exc.code.value}", file=sys.stderr)
-        return 1 if exc.code in integrity_codes else 2
+        return 1 if exc.code in INTEGRITY_FAILURE_CODES else 2
     except (GuardrailError, OSError, ValueError, yaml.YAMLError):
         category = (
             "configuration-error"

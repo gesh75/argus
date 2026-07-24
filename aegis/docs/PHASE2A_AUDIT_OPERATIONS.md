@@ -34,8 +34,8 @@ HMAC tips.
 
 - `0`: healthy diagnosis or completed durable recovery.
 - `1`: integrity/consistency failure or unmet recovery precondition.
-- `2`: usage, configuration, key, platform, trust, permission, timeout, or I/O
-  prevented reliable completion.
+- `2`: syntax, configuration, key, platform, trust, permission, timeout, or
+  I/O prevented reliable completion.
 
 Normal `AuditLog` construction remains fail closed. The diagnostic path is
 permanently unable to append audit events.
@@ -59,9 +59,10 @@ earlier signed record and is therefore provably stale:
 argus audit --reconcile-anchor --confirm
 ```
 
-Neither operation changes audit-log bytes. Missing confirmation is a usage
-error. Ahead, divergent, malformed, uninitialized, or non-comparable anchors
-are never repaired automatically. Preserve evidence and investigate.
+Neither operation changes audit-log bytes. Missing confirmation is an unmet
+recovery precondition and exits `1`. Ahead, divergent, malformed,
+uninitialized, or non-comparable anchors are never repaired automatically.
+Preserve evidence and investigate.
 
 ## Durability and uncertain commits
 

@@ -100,10 +100,15 @@ class AuditStorageError(Exception):
     """A redacted storage failure safe to expose to operators."""
 
     def __init__(
-        self, code: AuditFailureCode, *, record_number: int | None = None
+        self,
+        code: AuditFailureCode,
+        *,
+        record_number: int | None = None,
+        cleanup_code: AuditFailureCode | None = None,
     ) -> None:
         self.code = code
         self.record_number = record_number
+        self.cleanup_code = cleanup_code
         super().__init__(str(self))
 
     def __str__(self) -> str:
@@ -112,7 +117,34 @@ class AuditStorageError(Exception):
             if self.record_number is not None
             else ""
         )
-        return f"{self.code.value}{suffix}"
+        cleanup = (
+            f"; cleanup={self.cleanup_code.value}"
+            if self.cleanup_code is not None
+            else ""
+        )
+        return f"{self.code.value}{suffix}{cleanup}"
+
+
+INTEGRITY_FAILURE_CODES = frozenset(
+    {
+        AuditFailureCode.MALFORMED_JSON,
+        AuditFailureCode.DUPLICATE_KEY,
+        AuditFailureCode.INVALID_UTF8,
+        AuditFailureCode.NON_OBJECT_JSON,
+        AuditFailureCode.INVALID_SCHEMA,
+        AuditFailureCode.INVALID_VERSION,
+        AuditFailureCode.INVALID_SEQUENCE,
+        AuditFailureCode.INVALID_PREV,
+        AuditFailureCode.INVALID_HMAC,
+        AuditFailureCode.INVALID_TIMESTAMP,
+        AuditFailureCode.UNTERMINATED_RECORD,
+        AuditFailureCode.ANCHOR_MISSING,
+        AuditFailureCode.ANCHOR_STALE,
+        AuditFailureCode.ANCHOR_AHEAD,
+        AuditFailureCode.ANCHOR_DIVERGENT,
+        AuditFailureCode.ANCHOR_MALFORMED,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -375,11 +407,20 @@ class HeldAuditLock:
 
 _PROCESS_LOCKS_GUARD = threading.Lock()
 _PROCESS_LOCKS: dict[str, threading.RLock] = {}
+_ACTIVE_LOCKS = threading.local()
 
 
 def _process_lock(identity: str) -> threading.RLock:
     with _PROCESS_LOCKS_GUARD:
         return _PROCESS_LOCKS.setdefault(identity, threading.RLock())
+
+
+def _thread_active_locks() -> dict[str, HeldAuditLock]:
+    active = getattr(_ACTIVE_LOCKS, "held", None)
+    if active is None:
+        active = {}
+        _ACTIVE_LOCKS.held = active
+    return active
 
 
 class AuditStorage:
@@ -407,39 +448,67 @@ class AuditStorage:
         except OSError as exc:
             raise AuditStorageError(AuditFailureCode.UNSAFE_PARENT) from exc
         process_lock = _process_lock(identity)
-        with process_lock:
+        deadline = self._io.monotonic() + LOCK_TIMEOUT_SECONDS
+        while not process_lock.acquire(blocking=False):
+            if self._io.monotonic() >= deadline:
+                raise AuditStorageError(AuditFailureCode.LOCK_TIMEOUT)
+            self._io.sleep(0.01)
+        active_locks = _thread_active_locks()
+        reentrant = active_locks.get(identity)
+        if reentrant is not None:
+            try:
+                reentrant.assert_held()
+                yield reentrant
+            finally:
+                process_lock.release()
+            return
+        if self._io.monotonic() >= deadline:
+            process_lock.release()
+            raise AuditStorageError(AuditFailureCode.LOCK_TIMEOUT)
+        parent: TrustedParent | None = None
+        lock_fd = -1
+        held: HeldAuditLock | None = None
+        try:
             parent = TrustedParent.open(self.audit_path.parent, io=self._io)
             lock_name = f".{self.audit_path.name}.lock"
-            lock_fd = -1
-            held: HeldAuditLock | None = None
+            lock_fd = parent.open_regular(
+                lock_name, os.O_RDWR | os.O_CREAT, create_mode=FILE_MODE
+            )
+            while True:
+                if self._io.monotonic() >= deadline:
+                    raise AuditStorageError(
+                        AuditFailureCode.LOCK_TIMEOUT
+                    )
+                try:
+                    self._io.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError as exc:
+                    retryable = isinstance(exc, BlockingIOError) or (
+                        exc.errno == errno.EINTR
+                    )
+                    if not retryable:
+                        raise
+                    if self._io.monotonic() >= deadline:
+                        raise AuditStorageError(
+                            AuditFailureCode.LOCK_TIMEOUT
+                        ) from exc
+                    self._io.sleep(0.01)
+            held = HeldAuditLock(
+                audit_parent=parent,
+                lock_fd=lock_fd,
+                audit_name=self.audit_path.name,
+                lock_name=lock_name,
+                _token=object(),
+            )
+            active_locks[identity] = held
+            yield held
+        except AuditStorageError:
+            raise
+        except OSError as exc:
+            raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
+        finally:
             try:
-                lock_fd = parent.open_regular(
-                    lock_name, os.O_RDWR | os.O_CREAT, create_mode=FILE_MODE
-                )
-                deadline = self._io.monotonic() + LOCK_TIMEOUT_SECONDS
-                while True:
-                    try:
-                        self._io.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        break
-                    except BlockingIOError as exc:
-                        if self._io.monotonic() >= deadline:
-                            raise AuditStorageError(
-                                AuditFailureCode.LOCK_TIMEOUT
-                            ) from exc
-                        self._io.sleep(0.01)
-                held = HeldAuditLock(
-                    audit_parent=parent,
-                    lock_fd=lock_fd,
-                    audit_name=self.audit_path.name,
-                    lock_name=lock_name,
-                    _token=object(),
-                )
-                yield held
-            except AuditStorageError:
-                raise
-            except OSError as exc:
-                raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
-            finally:
+                active_locks.pop(identity, None)
                 if held is not None:
                     held._active = False
                     try:
@@ -448,7 +517,10 @@ class AuditStorage:
                         pass
                 if lock_fd >= 0:
                     self._io.close(lock_fd)
-                parent.close()
+                if parent is not None:
+                    parent.close()
+            finally:
+                process_lock.release()
 
     def open_anchor_parent_locked(
         self, held: HeldAuditLock

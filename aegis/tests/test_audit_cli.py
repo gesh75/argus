@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import fields
+from inspect import signature
 from pathlib import Path
 
 import pytest
@@ -193,6 +195,24 @@ def test_cli_bootstrap_requires_confirmation_then_succeeds(
 
 
 @pytest.mark.parametrize(
+    "recovery_flag", ["bootstrap_anchor", "reconcile_anchor"]
+)
+def test_recovery_requires_confirmation(
+    tmp_path: Path, monkeypatch, recovery_flag: str
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    args = argparse.Namespace(
+        policy=str(policy_file(tmp_path, anchor=True)),
+        bootstrap_anchor=recovery_flag == "bootstrap_anchor",
+        reconcile_anchor=recovery_flag == "reconcile_anchor",
+        confirm=False,
+    )
+    assert cli.cmd_audit(args) == 1
+    assert not (tmp_path / "audit.ndjson").exists()
+    assert not (tmp_path / "anchor.json").exists()
+
+
+@pytest.mark.parametrize(
     "raw",
     [
         b"{broken\n",
@@ -263,4 +283,21 @@ def test_cli_missing_key_returns_two(tmp_path: Path, monkeypatch) -> None:
             )
         )
         == 2
+    )
+
+
+def test_no_operational_crash_control_exists() -> None:
+    from aegis.audit_storage import AuditStorage
+
+    parser = cli.build_parser()
+    option_names = {
+        option
+        for action in parser._actions
+        for option in action.option_strings
+    }
+    policy_fields = {field.name for field in fields(Policy)}
+    constructor_parameters = set(signature(AuditStorage).parameters)
+    surfaces = option_names | policy_fields | constructor_parameters
+    assert not any(
+        "crash" in name or "checkpoint" in name for name in surfaces
     )
