@@ -14,16 +14,23 @@ Hardening (from adversarial review):
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import ipaddress
-import json
 import os
 import re
 import time
 from dataclasses import dataclass
 
 from .config import Policy
+from . import anchor
+from .audit_storage import (
+    AnchorState,
+    AuditStorage,
+    AuditStorageError,
+    HeldAuditLock,
+    JsonValue,
+    LogState,
+    ReplayResult,
+)
 
 _SHELL_METACHARS = re.compile(r"[;&|`$><\n\r\\]|\$\(")
 _DOTTED = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:/(\d{1,2}))?$")
@@ -100,7 +107,7 @@ MIN_AUDIT_KEY_LEN = 32
 
 
 class AuditLog:
-    """HMAC-SHA256 chained, append-only, tamper-evident audit trail."""
+    """Compatibility façade over the transactional audit storage boundary."""
 
     def __init__(self, policy: Policy):
         key = os.environ.get(policy.audit_key_env)
@@ -117,73 +124,128 @@ class AuditLog:
         self._path = policy.audit_path
         self._chained = policy.audit_chained
         self._anchor_path = policy.audit_anchor_path
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._prev, self._seq = self._last_state()
+        self._storage = AuditStorage(
+            self._path,
+            key=self._key,
+            chained=self._chained,
+            anchor_path=self._anchor_path,
+        )
+        try:
+            with self._storage.locked_operation() as held:
+                replay = self._storage.replay_locked(held)
+                state = self._anchor_state_locked(held, replay)
+                if state not in {
+                    AnchorState.DISABLED,
+                    AnchorState.UNINITIALIZED,
+                    AnchorState.MATCH,
+                }:
+                    raise AuditStorageError(_anchor_failure_code(state))
+        except AuditStorageError as exc:
+            raise GuardrailError(f"audit storage: {exc}") from exc
 
-    def _last_state(self) -> tuple[str, int]:
-        """Return (last_hmac, entry_count) by replaying the existing log."""
-        if not self._path.exists():
-            return "genesis", 0
-        last, seq = "genesis", 0
-        for line in self._path.read_text().splitlines():
-            if line.strip():
+    def _anchor_state_locked(
+        self, held: HeldAuditLock, replay: ReplayResult
+    ) -> AnchorState:
+        if self._anchor_path is None:
+            return AnchorState.DISABLED
+        parent = self._storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            anchor.cleanup_anchor_temps_locked(
+                held, parent, self._anchor_path.name
+            )
+            read = anchor.read_anchor_locked(
+                held, parent, self._anchor_path.name
+            )
+            return anchor.classify_anchor(replay, read, configured=True)
+        finally:
+            parent.close()
+
+    def write(self, event: dict[str, JsonValue]) -> str:
+        try:
+            with self._storage.locked_operation() as held:
+                replay = self._storage.replay_locked(held)
+                anchor_parent = self._storage.open_anchor_parent_locked(held)
                 try:
-                    last = json.loads(line)["hmac"]
-                    seq += 1
-                except (json.JSONDecodeError, KeyError):
-                    continue
-        return last, seq
-
-    def write(self, event: dict) -> str:
-        entry = {"ts": round(time.time(), 3),
-                 "prev": self._prev if self._chained else None, **event}
-        body = json.dumps(entry, sort_keys=True, separators=(",", ":"))
-        signed = (self._prev + body) if self._chained else body
-        mac = hmac.new(self._key, signed.encode(), hashlib.sha256).hexdigest()
-        entry["hmac"] = mac
-        with self._path.open("a") as fh:
-            fh.write(json.dumps(entry, separators=(",", ":")) + "\n")
-        self._prev = mac
-        self._seq += 1
-        # Update the out-of-band anchor so the chain tip is mirrored to a WORM store (#5).
-        if self._anchor_path is not None:
-            from . import anchor
-            anchor.write_anchor(self._anchor_path, self._seq, mac, entry["ts"])
-        return mac
+                    if anchor_parent is None:
+                        state = AnchorState.DISABLED
+                    else:
+                        anchor.cleanup_anchor_temps_locked(
+                            held, anchor_parent, self._anchor_path.name
+                        )
+                        read = anchor.read_anchor_locked(
+                            held, anchor_parent, self._anchor_path.name
+                        )
+                        state = anchor.classify_anchor(
+                            replay, read, configured=True
+                        )
+                    if state not in {
+                        AnchorState.DISABLED,
+                        AnchorState.UNINITIALIZED,
+                        AnchorState.MATCH,
+                    }:
+                        raise AuditStorageError(_anchor_failure_code(state))
+                    result = self._storage.append_v2_locked(
+                        held, replay, event, ts=round(time.time(), 3)
+                    )
+                    if anchor_parent is not None:
+                        anchor.write_anchor_locked(
+                            held,
+                            anchor_parent,
+                            self._anchor_path.name,
+                            anchor.AnchorRecord(
+                                result.seq, result.hmac, result.ts
+                            ),
+                        )
+                    return result.hmac
+                finally:
+                    if anchor_parent is not None:
+                        anchor_parent.close()
+        except AuditStorageError as exc:
+            raise GuardrailError(f"audit storage: {exc}") from exc
 
     def cross_check_anchor(self) -> tuple[bool, str]:
-        """Compare the live chain tip against the out-of-band anchor (#5).
-
-        Detects a full-log rewrite that the in-file HMAC alone cannot (an attacker with the
-        leaked key recomputes every MAC, but cannot also forge the WORM anchor).
-        """
-        if self._anchor_path is None:
-            return True, "no anchor configured"
-        from . import anchor
-        rec = anchor.read_anchor(self._anchor_path)
-        if rec is None:
-            return False, "anchor missing — chain tip was never anchored or anchor was deleted"
-        tip, seq = self._last_state()
-        if rec.get("tip") != tip or rec.get("seq") != seq:
-            return (False, f"anchor mismatch — anchor=(seq={rec.get('seq')}, "
-                    f"tip={str(rec.get('tip'))[:8]}…) chain=(seq={seq}, tip={tip[:8]}…)")
-        return True, f"anchor matches chain tip (seq={seq})"
+        try:
+            with self._storage.locked_operation() as held:
+                replay = self._storage.replay_locked(held)
+                state = self._anchor_state_locked(held, replay)
+                healthy = state in {
+                    AnchorState.DISABLED,
+                    AnchorState.UNINITIALIZED,
+                    AnchorState.MATCH,
+                }
+                return healthy, (
+                    f"anchor {state.value} (records={replay.count})"
+                )
+        except AuditStorageError as exc:
+            return False, f"audit storage {exc.code.value}"
 
     def verify(self) -> bool:
-        """Replay the chain; False if any entry was altered, reordered, or removed."""
-        prev = "genesis"
-        for line in self._path.read_text().splitlines():
-            if not line.strip():
-                continue
-            entry = json.loads(line)
-            stored = entry.pop("hmac")
-            body = json.dumps(entry, sort_keys=True, separators=(",", ":"))
-            signed = (prev + body) if self._chained else body
-            expect = hmac.new(self._key, signed.encode(), hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(stored, expect):
-                return False
-            prev = stored
-        return True
+        try:
+            with self._storage.locked_operation() as held:
+                replay = self._storage.replay_locked(held)
+                state = self._anchor_state_locked(held, replay)
+                return state in {
+                    AnchorState.DISABLED,
+                    AnchorState.UNINITIALIZED,
+                    AnchorState.MATCH,
+                }
+        except AuditStorageError:
+            return False
+
+
+def _anchor_failure_code(state: AnchorState):
+    from .audit_storage import AuditFailureCode
+
+    mapping = {
+        AnchorState.MISSING: AuditFailureCode.ANCHOR_MISSING,
+        AnchorState.STALE: AuditFailureCode.ANCHOR_STALE,
+        AnchorState.AHEAD: AuditFailureCode.ANCHOR_AHEAD,
+        AnchorState.DIVERGENT: AuditFailureCode.ANCHOR_DIVERGENT,
+        AnchorState.MALFORMED: AuditFailureCode.ANCHOR_MALFORMED,
+        AnchorState.NOT_COMPARABLE: AuditFailureCode.INVALID_SCHEMA,
+    }
+    return mapping.get(state, AuditFailureCode.INVALID_SCHEMA)
 
 
 class Budget:
