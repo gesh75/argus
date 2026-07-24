@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import errno
+import fcntl
 import json
 import math
+import os
 import re
+import stat
+import threading
+import time
+from contextlib import contextmanager
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal, TypeAlias
+from pathlib import Path
+from typing import Iterator, Literal, Protocol, Self, TypeAlias
 
 AUDIT_VERSION = 2
 GENESIS = "genesis"
@@ -149,6 +157,298 @@ class DiagnosticReport:
     record_count: int
     error_code: AuditFailureCode | None
     error_record: int | None
+
+
+class _AuditIO(Protocol):
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int: ...
+
+    def close(self, fd: int) -> None: ...
+
+    def fstat(self, fd: int) -> os.stat_result: ...
+
+    def flock(self, fd: int, operation: int) -> None: ...
+
+    def monotonic(self) -> float: ...
+
+    def sleep(self, seconds: float) -> None: ...
+
+    def fsync(self, fd: int) -> None: ...
+
+    def write(self, fd: int, data: bytes) -> int: ...
+
+    def read(self, fd: int, size: int) -> bytes: ...
+
+    def replace(
+        self,
+        source: str,
+        destination: str,
+        *,
+        source_dir_fd: int,
+        destination_dir_fd: int,
+    ) -> None: ...
+
+    def unlink(self, name: str, *, dir_fd: int) -> None: ...
+
+    def listdir(self, fd: int) -> list[str]: ...
+
+    def checkpoint(self, point: AuditCheckpoint) -> None: ...
+
+
+class _PosixAuditIO:
+    def open(
+        self,
+        path: str,
+        flags: int,
+        mode: int = FILE_MODE,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        return os.open(path, flags, mode, dir_fd=dir_fd)
+
+    def close(self, fd: int) -> None:
+        os.close(fd)
+
+    def fstat(self, fd: int) -> os.stat_result:
+        return os.fstat(fd)
+
+    def flock(self, fd: int, operation: int) -> None:
+        fcntl.flock(fd, operation)
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
+
+    def fsync(self, fd: int) -> None:
+        os.fsync(fd)
+
+    def write(self, fd: int, data: bytes) -> int:
+        return os.write(fd, data)
+
+    def read(self, fd: int, size: int) -> bytes:
+        return os.read(fd, size)
+
+    def replace(
+        self,
+        source: str,
+        destination: str,
+        *,
+        source_dir_fd: int,
+        destination_dir_fd: int,
+    ) -> None:
+        os.replace(
+            source,
+            destination,
+            src_dir_fd=source_dir_fd,
+            dst_dir_fd=destination_dir_fd,
+        )
+
+    def unlink(self, name: str, *, dir_fd: int) -> None:
+        os.unlink(name, dir_fd=dir_fd)
+
+    def listdir(self, fd: int) -> list[str]:
+        return os.listdir(fd)
+
+    def checkpoint(self, point: AuditCheckpoint) -> None:
+        del point
+
+
+@dataclass(slots=True)
+class TrustedParent:
+    path: Path
+    fd: int
+    owner_uid: int
+    _io: _AuditIO
+
+    @classmethod
+    def open(cls, parent: Path, *, io: _AuditIO) -> Self:
+        try:
+            resolved = parent.resolve(strict=True)
+            fd = io.open(
+                str(resolved),
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+            )
+        except (FileNotFoundError, NotADirectoryError, OSError) as exc:
+            raise AuditStorageError(AuditFailureCode.UNSAFE_PARENT) from exc
+        try:
+            metadata = io.fstat(fd)
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise AuditStorageError(AuditFailureCode.UNSAFE_PARENT)
+            if metadata.st_uid != os.geteuid():
+                raise AuditStorageError(AuditFailureCode.UNSAFE_OWNER)
+            if stat.S_IMODE(metadata.st_mode) & 0o022:
+                raise AuditStorageError(AuditFailureCode.UNSAFE_MODE)
+            return cls(resolved, fd, metadata.st_uid, io)
+        except BaseException:
+            io.close(fd)
+            raise
+
+    def open_regular(
+        self,
+        name: str,
+        flags: int,
+        *,
+        create_mode: int = FILE_MODE,
+    ) -> int:
+        if not name or Path(name).name != name:
+            raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
+        try:
+            fd = self._io.open(
+                name,
+                flags
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                create_mode,
+                dir_fd=self.fd,
+            )
+        except OSError as exc:
+            code = (
+                AuditFailureCode.SYMLINK
+                if exc.errno in {errno.ELOOP, errno.EMLINK}
+                else AuditFailureCode.NON_REGULAR_FILE
+                if exc.errno in {errno.EISDIR, errno.ENXIO}
+                else AuditFailureCode.IO_FAILURE
+            )
+            raise AuditStorageError(code) from exc
+        try:
+            metadata = self._io.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise AuditStorageError(AuditFailureCode.NON_REGULAR_FILE)
+            if metadata.st_uid != self.owner_uid:
+                raise AuditStorageError(AuditFailureCode.UNSAFE_OWNER)
+            if stat.S_IMODE(metadata.st_mode) & 0o077:
+                raise AuditStorageError(AuditFailureCode.UNSAFE_MODE)
+            return fd
+        except BaseException:
+            self._io.close(fd)
+            raise
+
+    def replace(self, source_name: str, destination_name: str) -> None:
+        self._io.replace(
+            source_name,
+            destination_name,
+            source_dir_fd=self.fd,
+            destination_dir_fd=self.fd,
+        )
+
+    def unlink_regular(self, name: str) -> None:
+        fd = self.open_regular(name, os.O_RDONLY)
+        self._io.close(fd)
+        self._io.unlink(name, dir_fd=self.fd)
+
+    def fsync(self) -> None:
+        self._io.fsync(self.fd)
+
+    def close(self) -> None:
+        self._io.close(self.fd)
+
+
+@dataclass(slots=True)
+class HeldAuditLock:
+    audit_parent: TrustedParent
+    lock_fd: int
+    audit_name: str
+    lock_name: str
+    _token: object
+    _active: bool = True
+
+    def assert_held(self) -> None:
+        if not self._active:
+            raise AuditStorageError(AuditFailureCode.WRITE_DISABLED)
+
+
+_PROCESS_LOCKS_GUARD = threading.Lock()
+_PROCESS_LOCKS: dict[str, threading.RLock] = {}
+
+
+def _process_lock(identity: str) -> threading.RLock:
+    with _PROCESS_LOCKS_GUARD:
+        return _PROCESS_LOCKS.setdefault(identity, threading.RLock())
+
+
+class AuditStorage:
+    def __init__(
+        self,
+        audit_path: Path,
+        *,
+        key: bytes,
+        chained: bool,
+        anchor_path: Path | None,
+        _io: _AuditIO | None = None,
+    ) -> None:
+        self.audit_path = Path(audit_path)
+        self.key = key
+        self.chained = chained
+        self.anchor_path = Path(anchor_path) if anchor_path is not None else None
+        self._io = _io or _PosixAuditIO()
+
+    @contextmanager
+    def locked_operation(self) -> Iterator[HeldAuditLock]:
+        try:
+            identity = str(self.audit_path.parent.resolve(strict=True) / self.audit_path.name)
+        except OSError as exc:
+            raise AuditStorageError(AuditFailureCode.UNSAFE_PARENT) from exc
+        process_lock = _process_lock(identity)
+        with process_lock:
+            parent = TrustedParent.open(self.audit_path.parent, io=self._io)
+            lock_name = f".{self.audit_path.name}.lock"
+            lock_fd = -1
+            held: HeldAuditLock | None = None
+            try:
+                lock_fd = parent.open_regular(
+                    lock_name, os.O_RDWR | os.O_CREAT, create_mode=FILE_MODE
+                )
+                deadline = self._io.monotonic() + LOCK_TIMEOUT_SECONDS
+                while True:
+                    try:
+                        self._io.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError as exc:
+                        if self._io.monotonic() >= deadline:
+                            raise AuditStorageError(
+                                AuditFailureCode.LOCK_TIMEOUT
+                            ) from exc
+                        self._io.sleep(0.01)
+                held = HeldAuditLock(
+                    audit_parent=parent,
+                    lock_fd=lock_fd,
+                    audit_name=self.audit_path.name,
+                    lock_name=lock_name,
+                    _token=object(),
+                )
+                yield held
+            except AuditStorageError:
+                raise
+            except OSError as exc:
+                raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
+            finally:
+                if held is not None:
+                    held._active = False
+                    try:
+                        self._io.flock(lock_fd, fcntl.LOCK_UN)
+                    except OSError:
+                        pass
+                if lock_fd >= 0:
+                    self._io.close(lock_fd)
+                parent.close()
+
+    def open_anchor_parent_locked(
+        self, held: HeldAuditLock
+    ) -> TrustedParent | None:
+        held.assert_held()
+        if self.anchor_path is None:
+            return None
+        return TrustedParent.open(self.anchor_path.parent, io=self._io)
 
 
 class _DuplicateKey(ValueError):
