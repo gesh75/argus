@@ -212,6 +212,80 @@ def test_recovery_requires_confirmation(
     assert not (tmp_path / "anchor.json").exists()
 
 
+def test_bootstrap_and_reconcile_success_return_zero(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    unanchored_policy_path = policy_file(tmp_path)
+    unanchored = Policy.load(unanchored_policy_path)
+    log = AuditLog(unanchored)
+    log.write({"event": "one"})
+    first = json.loads(unanchored.audit_path.read_text())
+    configured_path = policy_file(tmp_path, anchor=True)
+    assert (
+        cli.main(
+            [
+                "--policy",
+                str(configured_path),
+                "audit",
+                "--bootstrap-anchor",
+                "--confirm",
+            ]
+        )
+        == 0
+    )
+    configured = Policy.load(configured_path)
+    AuditLog(configured).write({"event": "two"})
+    configured.audit_anchor_path.write_text(
+        json.dumps(
+            {"seq": 1, "tip": first["hmac"], "ts": first["ts"]}
+        )
+        + "\n"
+    )
+    configured.audit_anchor_path.chmod(0o600)
+    assert (
+        cli.main(
+            [
+                "--policy",
+                str(configured_path),
+                "audit",
+                "--reconcile-anchor",
+                "--confirm",
+            ]
+        )
+        == 0
+    )
+
+
+def test_cli_output_redacts_sensitive_values_and_hmac_tips(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    from aegis.audit_storage import GENESIS, encode_v2_record
+
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    sensitive_value = "private-event-value"
+    record, committed = encode_v2_record(
+        {"event": sensitive_value},
+        key=b"k" * 32,
+        seq=1,
+        prev=GENESIS,
+        ts=1,
+    )
+    corrupted = json.loads(record)
+    corrupted["hmac"] = "0" * 64
+    log_path = tmp_path / "audit.ndjson"
+    log_path.write_text(json.dumps(corrupted) + "\n")
+    log_path.chmod(0o600)
+    assert (
+        cli.main(["--policy", str(policy_file(tmp_path)), "audit"]) == 1
+    )
+    output = capsys.readouterr()
+    rendered = output.out + output.err
+    assert sensitive_value not in rendered
+    assert committed.hmac not in rendered
+    assert "0" * 64 not in rendered
+
+
 @pytest.mark.parametrize(
     "raw",
     [

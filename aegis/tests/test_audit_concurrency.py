@@ -91,6 +91,54 @@ def test_exit_after_log_fsync_leaves_complete_record_and_releases_lock(
         assert storage.replay_locked(held).count == 1
 
 
+def test_crash_after_log_fsync_leaves_stale_anchor(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "audit.ndjson"
+    anchor_path = tmp_path / "anchor.json"
+    storage = AuditStorage(
+        path, key=TEST_KEY, chained=True, anchor_path=anchor_path
+    )
+    with storage.locked_operation() as held:
+        replay = storage.replay_locked(held)
+        first = storage.append_v2_locked(
+            held, replay, {"event": "seed"}, ts=1
+        )
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            anchor.write_anchor_locked(
+                held,
+                parent,
+                anchor_path.name,
+                anchor.AnchorRecord(first.seq, first.hmac, first.ts),
+            )
+        finally:
+            parent.close()
+    process = spawned(
+        checkpoint_worker,
+        str(path),
+        str(anchor_path),
+        AuditCheckpoint.AFTER_LOG_FSYNC.value,
+    )
+    assert process.exitcode == 77
+    with storage.locked_operation() as held:
+        replay = storage.replay_locked(held)
+        parent = storage.open_anchor_parent_locked(held)
+        assert parent is not None
+        try:
+            read = anchor.read_anchor_locked(
+                held, parent, anchor_path.name
+            )
+            assert replay.count == 2
+            assert (
+                anchor.classify_anchor(replay, read, configured=True)
+                is AnchorState.STALE
+            )
+        finally:
+            parent.close()
+
+
 def test_exit_after_anchor_file_fsync_leaves_stale_anchor(
     tmp_path: Path,
 ) -> None:

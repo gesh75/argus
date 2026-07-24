@@ -25,7 +25,7 @@ from aegis.audit_storage import (
     replay_bytes,
 )
 from aegis.config import DEFAULT_POLICY, Policy
-from aegis.guardrail import AuditLog
+from aegis.guardrail import AuditLog, GuardrailError
 from tests.audit_support import TEST_KEY, signed_v1
 
 
@@ -528,6 +528,17 @@ def test_confirmed_bootstrap_changes_only_missing_anchor(
     assert (tmp_path / "anchor.json").exists()
 
 
+def test_populated_log_with_missing_anchor_is_refused(
+    tmp_path: Path, monkeypatch
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    AuditLog(policy).write({"event": "one"})
+    policy.audit_anchor_path.unlink()
+    with pytest.raises(GuardrailError) as error:
+        AuditLog(policy)
+    assert "anchor-missing" in str(error.value)
+
+
 def test_bootstrap_refuses_empty_or_unconfirmed(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -540,6 +551,22 @@ def test_bootstrap_refuses_empty_or_unconfirmed(
         diagnostic.bootstrap_anchor(confirmed=True)
     assert not policy.audit_path.exists()
     assert not (tmp_path / "anchor.json").exists()
+
+
+@pytest.mark.parametrize("invalid_state", ["existing", "invalid-history"])
+def test_bootstrap_refuses_invalid_states(
+    tmp_path: Path, monkeypatch, invalid_state: str
+) -> None:
+    policy = diagnostic_policy(tmp_path, monkeypatch)
+    if invalid_state == "existing":
+        AuditLog(policy).write({"event": "one"})
+    else:
+        policy.audit_path.write_bytes(b"{broken\n")
+        policy.audit_path.chmod(0o600)
+    before = policy.audit_path.read_bytes()
+    with pytest.raises(AuditStorageError):
+        AuditLog._for_diagnostics(policy).bootstrap_anchor(confirmed=True)
+    assert policy.audit_path.read_bytes() == before
 
 
 def test_reconcile_updates_only_proven_stale_anchor(

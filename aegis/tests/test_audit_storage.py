@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import math
 from pathlib import Path
@@ -8,10 +10,12 @@ import pytest
 
 from aegis.audit_storage import (
     GENESIS,
+    V2_DOMAIN_SEPARATOR,
     AuditFailureCode,
     AuditStorage,
     AuditStorageError,
     LogState,
+    canonical_v2_body,
     decode_v2_record,
     encode_v2_record,
     replay_bytes,
@@ -44,6 +48,22 @@ def test_strict_json_rejects_invalid_input(raw: bytes, code: AuditFailureCode) -
         strict_json_object(raw, record_number=3)
     assert error.value.code is code
     assert str(error.value) == f"{code.value} at record 3"
+
+
+@pytest.mark.parametrize("raw", [b"[]", b'"text"', b"1", b"null"])
+def test_non_object_json_values_are_rejected(raw: bytes) -> None:
+    with pytest.raises(AuditStorageError) as error:
+        strict_json_object(raw, record_number=1)
+    assert error.value.code is AuditFailureCode.NON_OBJECT_JSON
+
+
+@pytest.mark.parametrize("token", [b"NaN", b"Infinity", b"-Infinity"])
+def test_nonfinite_json_constants_are_rejected(token: bytes) -> None:
+    with pytest.raises(AuditStorageError) as error:
+        strict_json_object(
+            b'{"event":' + token + b"}", record_number=1
+        )
+    assert error.value.code is AuditFailureCode.MALFORMED_JSON
 
 
 @pytest.mark.parametrize("chained", [True, False])
@@ -218,6 +238,16 @@ def test_malformed_json_in_middle_rejected() -> None:
     assert error.value.record_number == 2
 
 
+def test_malformed_json_final_record_rejected() -> None:
+    first, _ = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(first + b"{broken\n", key=TEST_KEY)
+    assert error.value.code is AuditFailureCode.MALFORMED_JSON
+    assert error.value.record_number == 2
+
+
 def test_missing_hmac_rejected() -> None:
     record, _ = encode_v2_record(
         {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
@@ -227,6 +257,29 @@ def test_missing_hmac_rejected() -> None:
     with pytest.raises(AuditStorageError) as error:
         replay_bytes(json.dumps(data).encode() + b"\n", key=TEST_KEY)
     assert error.value.code is AuditFailureCode.INVALID_SCHEMA
+
+
+def test_altered_event_rejected() -> None:
+    record, _ = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(
+            replace_json_field(record, "event", "altered"), key=TEST_KEY
+        )
+    assert error.value.code is AuditFailureCode.INVALID_HMAC
+
+
+def test_reordered_records_rejected() -> None:
+    first, append = encode_v2_record(
+        {"event": "one"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1
+    )
+    second, _ = encode_v2_record(
+        {"event": "two"}, key=TEST_KEY, seq=2, prev=append.hmac, ts=2
+    )
+    with pytest.raises(AuditStorageError) as error:
+        replay_bytes(second + first, key=TEST_KEY)
+    assert error.value.code is AuditFailureCode.INVALID_SEQUENCE
 
 
 @pytest.mark.parametrize(
@@ -283,6 +336,20 @@ def test_nonfinite_timestamp_is_rejected() -> None:
     with pytest.raises(AuditStorageError) as error:
         decode_v2_record(data, expected_seq=1)
     assert error.value.code is AuditFailureCode.INVALID_TIMESTAMP
+
+
+def test_v2_signed_bytes_are_independently_reproducible() -> None:
+    encoded, result = encode_v2_record(
+        {"event": "café"}, key=TEST_KEY, seq=1, prev=GENESIS, ts=1.25
+    )
+    data = json.loads(encoded)
+    stored = data.pop("hmac")
+    independent = hmac.new(
+        TEST_KEY,
+        V2_DOMAIN_SEPARATOR + canonical_v2_body(data),
+        hashlib.sha256,
+    ).hexdigest()
+    assert stored == result.hmac == independent
 
 
 def test_sensitive_values_never_appear_in_errors() -> None:
