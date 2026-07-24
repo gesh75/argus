@@ -450,6 +450,81 @@ class AuditStorage:
             return None
         return TrustedParent.open(self.anchor_path.parent, io=self._io)
 
+    def replay_locked(self, held: HeldAuditLock) -> ReplayResult:
+        held.assert_held()
+        fd = -1
+        try:
+            try:
+                fd = held.audit_parent.open_regular(
+                    held.audit_name, os.O_RDONLY
+                )
+            except AuditStorageError as exc:
+                if isinstance(exc.__cause__, FileNotFoundError):
+                    return replay_bytes(b"", key=self.key)
+                raise
+            chunks: list[bytes] = []
+            while True:
+                chunk = self._io.read(fd, 1024 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            return replay_bytes(b"".join(chunks), key=self.key)
+        except AuditStorageError:
+            raise
+        except OSError as exc:
+            raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
+        finally:
+            if fd >= 0:
+                self._io.close(fd)
+
+    def append_v2_locked(
+        self,
+        held: HeldAuditLock,
+        replay: ReplayResult,
+        event: Mapping[str, JsonValue],
+        *,
+        ts: int | float,
+    ) -> AppendResult:
+        held.assert_held()
+        if not self.chained:
+            raise AuditStorageError(AuditFailureCode.WRITE_DISABLED)
+        if replay.state not in {
+            LogState.EMPTY,
+            LogState.VALID_V1,
+            LogState.VALID_V2,
+            LogState.VALID_V1_V2,
+        }:
+            raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
+        encoded, result = encode_v2_record(
+            event,
+            key=self.key,
+            seq=replay.count + 1,
+            prev=replay.tip,
+            ts=ts,
+        )
+        fd = -1
+        try:
+            fd = held.audit_parent.open_regular(
+                held.audit_name,
+                os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+                create_mode=FILE_MODE,
+            )
+            offset = 0
+            while offset < len(encoded):
+                written = self._io.write(fd, encoded[offset:])
+                if written <= 0:
+                    raise AuditStorageError(AuditFailureCode.IO_FAILURE)
+                offset += written
+            self._io.fsync(fd)
+            return result
+        except AuditStorageError:
+            raise
+        except OSError as exc:
+            raise AuditStorageError(AuditFailureCode.IO_FAILURE) from exc
+        finally:
+            if fd >= 0:
+                self._io.close(fd)
+
 
 class _DuplicateKey(ValueError):
     pass
