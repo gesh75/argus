@@ -15,7 +15,13 @@ from pathlib import Path
 
 from . import approval, egress, preflight
 from .config import DEFAULT_POLICY, Policy
-from .guardrail import Guardrail, GuardrailError
+from .audit_storage import (
+    AnchorState,
+    AuditStorageError,
+    DiagnosticReport,
+    LogState,
+)
+from .guardrail import AuditLog, Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
 from .sandbox import DockerSandbox, DryRunSandbox, LocalSandbox
@@ -200,14 +206,42 @@ def cmd_agent(args) -> int:
 
 
 def cmd_audit(args) -> int:
-    guard = _guard(args)
-    ok = guard.audit.verify()
-    print("audit chain:", "VALID ✅" if ok else "TAMPERED ❌")
-    if guard.policy.audit_anchor_path is not None:
-        anchored, reason = guard.audit.cross_check_anchor()
-        print("anchor:", "OK ✅" if anchored else "MISMATCH ❌", "—", reason)
-        ok = ok and anchored
-    return 0 if ok else 1
+    try:
+        diagnostic = AuditLog._for_diagnostics(Policy.load(args.policy))
+        report = diagnostic.inspect()
+    except (AuditStorageError, GuardrailError, OSError, ValueError) as exc:
+        category = (
+            exc.code.value
+            if isinstance(exc, AuditStorageError)
+            else "configuration-error"
+        )
+        print(f"audit_error={category}", file=sys.stderr)
+        return 2
+    _print_audit_report(report)
+    healthy = report.log_state in {
+        LogState.EMPTY,
+        LogState.VALID_V1,
+        LogState.VALID_V2,
+        LogState.VALID_V1_V2,
+    } and report.anchor_state in {
+        AnchorState.DISABLED,
+        AnchorState.UNINITIALIZED,
+        AnchorState.MATCH,
+    }
+    return 0 if healthy else 1
+
+
+def _print_audit_report(report: DiagnosticReport) -> None:
+    fields = [
+        f"log_state={report.log_state.value}",
+        f"anchor_state={report.anchor_state.value}",
+        f"records={report.record_count}",
+    ]
+    if report.error_code is not None:
+        fields.append(f"error={report.error_code.value}")
+    if report.error_record is not None:
+        fields.append(f"record={report.error_record}")
+    print(" ".join(fields))
 
 
 def cmd_approve(args) -> int:
@@ -331,6 +365,14 @@ def build_parser() -> argparse.ArgumentParser:
     ag.set_defaults(func=cmd_agent)
 
     a = sub.add_parser("audit", help="verify the HMAC audit chain (+ anchor cross-check)")
+    recovery = a.add_mutually_exclusive_group()
+    recovery.add_argument("--bootstrap-anchor", action="store_true")
+    recovery.add_argument("--reconcile-anchor", action="store_true")
+    a.add_argument(
+        "--confirm",
+        action="store_true",
+        help="confirm the explicitly requested anchor-only recovery",
+    )
     a.set_defaults(func=cmd_audit)
 
     ap = sub.add_parser("approve",

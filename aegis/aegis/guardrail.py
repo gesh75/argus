@@ -24,11 +24,12 @@ from .config import Policy
 from . import anchor
 from .audit_storage import (
     AnchorState,
+    AuditFailureCode,
     AuditStorage,
     AuditStorageError,
+    DiagnosticReport,
     HeldAuditLock,
     JsonValue,
-    LogState,
     ReplayResult,
 )
 
@@ -143,6 +144,10 @@ class AuditLog:
         except AuditStorageError as exc:
             raise GuardrailError(f"audit storage: {exc}") from exc
 
+    @classmethod
+    def _for_diagnostics(cls, policy: Policy) -> _DiagnosticAuditLog:
+        return _DiagnosticAuditLog(policy)
+
     def _anchor_state_locked(
         self, held: HeldAuditLock, replay: ReplayResult
     ) -> AnchorState:
@@ -234,9 +239,7 @@ class AuditLog:
             return False
 
 
-def _anchor_failure_code(state: AnchorState):
-    from .audit_storage import AuditFailureCode
-
+def _anchor_failure_code(state: AnchorState) -> AuditFailureCode:
     mapping = {
         AnchorState.MISSING: AuditFailureCode.ANCHOR_MISSING,
         AnchorState.STALE: AuditFailureCode.ANCHOR_STALE,
@@ -246,6 +249,109 @@ def _anchor_failure_code(state: AnchorState):
         AnchorState.NOT_COMPARABLE: AuditFailureCode.INVALID_SCHEMA,
     }
     return mapping.get(state, AuditFailureCode.INVALID_SCHEMA)
+
+
+_INTEGRITY_FAILURES = {
+    AuditFailureCode.MALFORMED_JSON,
+    AuditFailureCode.DUPLICATE_KEY,
+    AuditFailureCode.INVALID_UTF8,
+    AuditFailureCode.NON_OBJECT_JSON,
+    AuditFailureCode.INVALID_SCHEMA,
+    AuditFailureCode.INVALID_VERSION,
+    AuditFailureCode.INVALID_SEQUENCE,
+    AuditFailureCode.INVALID_PREV,
+    AuditFailureCode.INVALID_HMAC,
+    AuditFailureCode.INVALID_TIMESTAMP,
+    AuditFailureCode.UNTERMINATED_RECORD,
+}
+
+
+def _log_state_for_failure(code: AuditFailureCode):
+    from .audit_storage import LogState
+
+    if code in {
+        AuditFailureCode.MALFORMED_JSON,
+        AuditFailureCode.DUPLICATE_KEY,
+        AuditFailureCode.INVALID_UTF8,
+        AuditFailureCode.NON_OBJECT_JSON,
+        AuditFailureCode.UNTERMINATED_RECORD,
+    }:
+        return LogState.MALFORMED
+    if code is AuditFailureCode.INVALID_SEQUENCE:
+        return LogState.INVALID_SEQUENCE
+    if code is AuditFailureCode.INVALID_PREV:
+        return LogState.INVALID_PREV
+    if code is AuditFailureCode.INVALID_HMAC:
+        return LogState.INVALID_HMAC
+    return LogState.INVALID_SCHEMA
+
+
+class _DiagnosticAuditLog:
+    """Read-only audit inspection and explicitly bounded anchor recovery."""
+
+    def __init__(self, policy: Policy) -> None:
+        key = os.environ.get(policy.audit_key_env)
+        if not key:
+            raise GuardrailError(
+                f"audit key env {policy.audit_key_env} unset — refusing unauthenticated audit"
+            )
+        if len(key) < MIN_AUDIT_KEY_LEN:
+            raise GuardrailError(
+                f"audit key too short ({len(key)}<{MIN_AUDIT_KEY_LEN} chars)"
+            )
+        self._anchor_path = policy.audit_anchor_path
+        self._storage = AuditStorage(
+            policy.audit_path,
+            key=key.encode(),
+            chained=policy.audit_chained,
+            anchor_path=policy.audit_anchor_path,
+        )
+
+    def inspect(self) -> DiagnosticReport:
+        from .audit_storage import LogState
+
+        with self._storage.locked_operation() as held:
+            try:
+                replay = self._storage.replay_locked(held)
+            except AuditStorageError as exc:
+                if exc.code not in _INTEGRITY_FAILURES:
+                    raise
+                return DiagnosticReport(
+                    log_state=_log_state_for_failure(exc.code),
+                    anchor_state=(
+                        AnchorState.DISABLED
+                        if self._anchor_path is None
+                        else AnchorState.NOT_COMPARABLE
+                    ),
+                    record_count=max(0, (exc.record_number or 1) - 1),
+                    error_code=exc.code,
+                    error_record=exc.record_number,
+                )
+            if self._anchor_path is None:
+                anchor_state = AnchorState.DISABLED
+            else:
+                parent = self._storage.open_anchor_parent_locked(held)
+                assert parent is not None
+                try:
+                    read = anchor.read_anchor_locked(
+                        held, parent, self._anchor_path.name
+                    )
+                    anchor_state = anchor.classify_anchor(
+                        replay, read, configured=True
+                    )
+                finally:
+                    parent.close()
+            return DiagnosticReport(
+                log_state=replay.state,
+                anchor_state=anchor_state,
+                record_count=replay.count,
+                error_code=None,
+                error_record=None,
+            )
+
+    def write(self, event: dict[str, JsonValue]) -> None:
+        del event
+        raise AuditStorageError(AuditFailureCode.WRITE_DISABLED)
 
 
 class Budget:
