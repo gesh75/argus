@@ -1,6 +1,7 @@
 """Guardrail tests — prove the bypass holes from the adversarial review are closed."""
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -9,7 +10,8 @@ import pytest
 os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 from aegis.config import Policy  # noqa: E402
-from aegis.guardrail import Guardrail, GuardrailError, canon_network  # noqa: E402
+from aegis.guardrail import AuditLog, Guardrail, GuardrailError, canon_network  # noqa: E402
+from tests.audit_support import signed_v1  # noqa: E402
 
 POLICY = Path(__file__).resolve().parents[2] / "targets" / "scope-policy.yaml"
 
@@ -143,3 +145,31 @@ def test_audit_chain_valid_then_tamper(guard):
     lines = p.read_text().splitlines()
     p.write_text("\n".join(lines[:-1]) + '\n{"event":"forged","hmac":"deadbeef"}\n')
     assert not guard.audit.verify()
+
+
+def test_normal_startup_rejects_malformed_history(tmp_path, monkeypatch):
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
+    path = tmp_path / "audit.ndjson"
+    path.write_bytes(b'{"event":"broken"}\n')
+    path.chmod(0o600)
+    policy = Policy.load(POLICY)
+    object.__setattr__(policy, "audit_path", path)
+    with pytest.raises(GuardrailError, match="invalid-schema"):
+        AuditLog(policy)
+
+
+def test_facade_transitions_independent_v1_to_v2(tmp_path, monkeypatch):
+    monkeypatch.setenv("PENTEST_AUDIT_HMAC_KEY", "phase-2a-test-key-material-32-bytes")
+    path = tmp_path / "audit.ndjson"
+    legacy, _ = signed_v1({"event": "legacy"}, seq=1)
+    path.write_bytes(legacy)
+    path.chmod(0o600)
+    policy = Policy.load(POLICY)
+    object.__setattr__(policy, "audit_path", path)
+    log = AuditLog(policy)
+    digest = log.write({"event": "current"})
+    assert isinstance(digest, str) and len(digest) == 64
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    assert records[-1]["audit_version"] == 2
+    assert records[-1]["seq"] == 2
+    assert log.verify() is True

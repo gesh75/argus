@@ -14,8 +14,10 @@ from aegis.recon import cred_exposure
 from aegis.tools import Observation
 
 
-def _guard(armed=None):
-    return Guardrail(Policy.load(DEFAULT_POLICY), armed=armed)
+def _guard(tmp_path, armed=None):
+    policy = Policy.load(DEFAULT_POLICY)
+    object.__setattr__(policy, "audit_path", tmp_path / "audit.ndjson")
+    return Guardrail(policy, armed=armed)
 
 
 # ---- Module 2: credential exposure -----------------------------------------
@@ -25,8 +27,8 @@ def test_gpp_cpassword_detected():
     assert any("GPP cpassword" in o.detail for o in out)
 
 
-def test_env_exposure_detected_and_redacted():
-    g = _guard()
+def test_env_exposure_detected_and_redacted(tmp_path):
+    g = _guard(tmp_path)
     obs = [Observation("172.30.0.10", "exposure", "secret: http://x/.env password=hunter2")]
     out = cred_exposure.detect(obs, sanitize=g.sanitize)
     assert out and "exposure" == out[0].kind
@@ -87,8 +89,8 @@ def test_chains_correlation_shape():
 
 
 # ---- Module 3b: planner loop -----------------------------------------------
-def test_planner_expands_from_web_evidence():
-    g = _guard()
+def test_planner_expands_from_web_evidence(tmp_path):
+    g = _guard(tmp_path)
 
     def collect(profile, target):
         if profile == "discovery":
@@ -103,15 +105,15 @@ def test_planner_expands_from_web_evidence():
     assert "discovery" in profiles_run and "web" in profiles_run
 
 
-def test_planner_denies_out_of_scope_target():
-    g = _guard()
+def test_planner_denies_out_of_scope_target(tmp_path):
+    g = _guard(tmp_path)
     p = planner.Planner(g, lambda prof, tgt: [], max_depth=3)
     run = p.run("8.8.8.8", seed_profile="discovery")
     assert all(not s.authorized for s in run.steps)
 
 
-def test_planner_respects_max_depth():
-    g = _guard()
+def test_planner_respects_max_depth(tmp_path):
+    g = _guard(tmp_path)
 
     def collect(profile, target):
         return [Observation(target, "service", "80/tcp http"),
@@ -125,35 +127,35 @@ def test_planner_respects_max_depth():
 
 
 # ---- PoC runner: three hard gates ------------------------------------------
-def test_poc_refused_when_not_armed():
-    g = _guard()  # not armed
+def test_poc_refused_when_not_armed(tmp_path):
+    g = _guard(tmp_path)  # not armed
     with pytest.raises(PoCRefused, match="not armed"):
         gate_check(g, "172.30.0.20", "service_reachable")
 
 
-def test_poc_refused_outside_lab_net():
-    g = _guard(armed=frozenset({"poc"}))
+def test_poc_refused_outside_lab_net(tmp_path):
+    g = _guard(tmp_path, armed=frozenset({"poc"}))
     os.environ["AEGIS_POC_CONFIRM_ISOLATED"] = "1"
     with pytest.raises(PoCRefused, match="lab-only|not inside lab"):
         gate_check(g, "10.0.0.5", "service_reachable")
 
 
-def test_poc_refused_without_isolation_attestation():
-    g = _guard(armed=frozenset({"poc"}))
+def test_poc_refused_without_isolation_attestation(tmp_path):
+    g = _guard(tmp_path, armed=frozenset({"poc"}))
     os.environ.pop("AEGIS_POC_CONFIRM_ISOLATED", None)
     with pytest.raises(PoCRefused, match="isolation|isolated"):
         gate_check(g, "172.30.0.20", "service_reachable")
 
 
-def test_poc_refused_for_uncatalogued_check():
-    g = _guard(armed=frozenset({"poc"}))
+def test_poc_refused_for_uncatalogued_check(tmp_path):
+    g = _guard(tmp_path, armed=frozenset({"poc"}))
     os.environ["AEGIS_POC_CONFIRM_ISOLATED"] = "1"
     with pytest.raises(PoCRefused, match="catalog"):
         gate_check(g, "172.30.0.20", "rm_rf_everything")
 
 
-def test_poc_runs_in_lab_with_all_gates_and_fixture_prober():
-    g = _guard(armed=frozenset({"poc"}))
+def test_poc_runs_in_lab_with_all_gates_and_fixture_prober(tmp_path):
+    g = _guard(tmp_path, armed=frozenset({"poc"}))
     os.environ["AEGIS_POC_CONFIRM_ISOLATED"] = "1"
     res = verify(g, "172.30.0.20", "service_reachable",
                  prober=lambda c, t: (True, "fixture: reachable"))

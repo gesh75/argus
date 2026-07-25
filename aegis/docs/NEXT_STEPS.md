@@ -60,12 +60,12 @@ signer the orchestrator talks to but never holds the key for.
 > Anderson 1972); "the key sits outside the log volume so an attacker who can write the log
 > can't read or rotate the key" (`bernstein` audit-log operations doc).
 
-### ✅ 5. External anchoring + WORM for the audit chain
-`AuditLog` mirrors the chain tip `{seq, tip, ts}` to an out-of-band **anchor file** after every
-entry (`anchor.py`); `aegis audit` **cross-checks** the live chain against it, so a full-log
-rewrite (even with a leaked key) is detectable. Enabled by setting `audit.anchor_path` in the
-policy. **🔭 Operational:** point that path at a real write-once store (S3 Object Lock compliance
-mode / KMS-signed object / WORM volume) owned by a different uid — the file format is ready.
+### ✅ 5. Transactional local consistency anchor
+`AuditLog` durably mirrors the chain tip `{seq, tip, ts}` to a strict local **anchor file**
+after every entry (`anchor.py`); `argus audit` classifies missing, stale, ahead, divergent,
+and malformed states. This ordinary JSON file is not itself external or WORM and cannot
+resist an attacker who controls both the log and anchor. A separately authenticated,
+independently administered external anchor remains future work.
 
 > *Best practice:* "HMAC alone does not defend against a compromised app — layer append-only
 > storage and external anchoring on top." — Tracehold; SystemsHardening audit-logging
@@ -123,11 +123,10 @@ enabled — so a human catches the misconfiguration at setup time rather than af
 
 ## Status
 **Done:** P0 (CI + supply-chain), P1.5/6/7, P2.8/9/10, and the P1.4 short-term key-strength gate.
-**Remaining:** P1.4 full out-of-band signer process, and the P1.5 production WORM target
-(the in-repo anchor format + cross-check are ready; pointing it at S3 Object Lock / KMS is an
-operational step).
+**Remaining:** P1.4 full out-of-band signer process and P1.5 independently administered
+WORM integration. The local JSON consistency anchor is not a remote-object adapter.
 
 ## Suggested sequencing (remaining)
-`P1.4 out-of-band signer` → wire `audit.anchor_path` to a real WORM store in production.
+`P1.4 out-of-band signer` → design a separately authenticated external-anchor integration.
 
 _Tracking issues are linked from each 🔭 item once opened._

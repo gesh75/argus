@@ -1,12 +1,13 @@
 """P1 hardening suite: approval gate (#6), anchoring (#5), egress (#7),
 pre-flight (#8), and audit-key strength (#4)."""
+import json
 import os
 
 os.environ.setdefault("PENTEST_AUDIT_HMAC_KEY", "k" * 32)
 
 import pytest
 
-from aegis import anchor, approval, egress, preflight
+from aegis import approval, egress, preflight
 from aegis.config import DEFAULT_POLICY, Policy
 from aegis.guardrail import AuditLog, GuardrailError
 
@@ -91,8 +92,9 @@ def test_anchor_tracks_chain_tip(tmp_path, monkeypatch):
     log.write({"event": "b"})
     ok, reason = log.cross_check_anchor()
     assert ok, reason
-    rec = anchor.read_anchor(log._anchor_path)
-    assert rec["seq"] == 2 and rec["tip"] == log._prev
+    rec = json.loads(log._anchor_path.read_text())
+    last = json.loads(log._path.read_text().splitlines()[-1])
+    assert rec["seq"] == 2 and rec["tip"] == last["hmac"]
 
 
 def test_anchor_detects_log_rewrite(tmp_path, monkeypatch):
@@ -103,7 +105,7 @@ def test_anchor_detects_log_rewrite(tmp_path, monkeypatch):
     lines = pol.audit_path.read_text().splitlines()
     pol.audit_path.write_text(lines[0] + "\n")
     ok, reason = log.cross_check_anchor()
-    assert not ok and "mismatch" in reason.lower()
+    assert not ok and "ahead" in reason.lower()
 
 
 def test_anchor_detects_missing_anchor(tmp_path, monkeypatch):

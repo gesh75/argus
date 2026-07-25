@@ -35,7 +35,8 @@ class Policy:
     audit_path: Path
     audit_chained: bool
     redact_patterns: tuple[str, ...] = field(default=())
-    # Optional out-of-band anchor for the chain tip (#5). Point at a WORM/append-only path.
+    # Optional local consistency anchor. Its parent must be pre-provisioned and trusted.
+    # A JSON file on the same host is not an external WORM control.
     audit_anchor_path: Path | None = None
 
     @staticmethod
