@@ -40,7 +40,7 @@ no LLM, no operator flag — may execute a tool call that was not authorized fir
 | Path | Why |
 |---|---|
 | `aegis/aegis/guardrail.py` | The reference monitor. Changes here can silently disable enforcement. |
-| `aegis/aegis/audit_storage.py`, `anchor.py` | Transactional tamper-evident audit chain (V1/V2 replay, flock, durable append). |
+| `aegis/aegis/audit_storage.py`, `aegis/aegis/anchor.py` | Transactional tamper-evident audit chain (V1/V2 replay, flock, durable append). |
 | `aegis/aegis/approval.py` | Parameter-bound, fail-closed approval tokens for `--sandbox local` / `--arm`. |
 | `aegis/aegis/sandbox.py` | Subprocess boundary: env scrubbing + process-group teardown. |
 | `aegis/aegis/config.py`, `targets/scope-policy.yaml` | Scope/tool policy. Parsed values are a security boundary. |
