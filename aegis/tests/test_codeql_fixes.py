@@ -41,17 +41,32 @@ def test_split_denial_matches_legacy_regex(line):
     assert _split_denial(line) == _legacy(line)
 
 
-def test_split_denial_is_linear_on_adversarial_input():
-    """A long colon-free token (reachable from untrusted tool output) stays fast.
+def test_split_denial_scales_linearly_not_quadratically():
+    """Doubling a colon-free token (reachable from untrusted tool output) must not
+    quadruple the work.
 
-    Guards the property CodeQL flagged: no super-linear backtracking. Generous bound —
-    this asserts "not pathological", not a micro-benchmark.
+    Asserts the *shape of the curve* rather than a wall-clock budget: an absolute
+    threshold is flaky on a shared/throttled CI runner, while super-linear growth is
+    what CodeQL's polynomial-redos rule is actually about. Linear doubles (~2x),
+    quadratic quadruples (~4x); we fail at 3x. Best-of-N minimum is used because
+    scheduler noise can only ever *add* time, never subtract it.
     """
     import time
-    evil = "tool " + "A" * 200_000
-    start = time.perf_counter()
-    assert _split_denial(evil) is None
-    assert time.perf_counter() - start < 1.0
+
+    def best_of(n_chars: int, rounds: int = 5) -> float:
+        line = "tool " + "A" * n_chars
+        best = float("inf")
+        for _ in range(rounds):
+            start = time.perf_counter()
+            _split_denial(line)
+            best = min(best, time.perf_counter() - start)
+        return best
+
+    assert _split_denial("tool " + "A" * 400_000) is None      # still correct at size
+    small = best_of(400_000)
+    large = best_of(800_000)
+    # 0.5 ms floor keeps the ratio meaningful when both samples are near timer noise.
+    assert large <= max(small * 3.0, 5e-4)
 
 
 def test_collapse_errors_still_groups_by_reason():
