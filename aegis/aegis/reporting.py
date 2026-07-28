@@ -3,11 +3,31 @@ from __future__ import annotations
 
 import csv
 import json
-import re
 from collections import defaultdict
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
+
+
+def _split_denial(e: str) -> tuple[str, str] | None:
+    """Parse 'tool target: reason' into (target, reason); None if it doesn't match.
+
+    Deliberately linear string ops rather than a regex. The previous pattern
+    (r"\\s*\\S+\\s+(\\S+):\\s*(.*)") backtracks polynomially on a long token with no
+    colon, and these strings are built from UNTRUSTED tool output — a crafted banner
+    could stall report generation (CodeQL: polynomial-redos). Every step below is O(n).
+    """
+    parts = e.split(None, 1)                 # \s* \S+ \s+  — split() eats whitespace runs
+    if len(parts) != 2:
+        return None
+    rest = parts[1]                          # no leading whitespace: split() already ate it
+    token = rest.split(None, 1)[0]           # leading non-whitespace run == the regex's \S+
+    tail = rest[len(token):]                 # slice, not split — keeps the original spacing
+    # greedy \S+ followed by ':' resolves to the LAST colon in the run (e.g. '[fe80::1]:').
+    target, sep, after = token.rpartition(":")
+    if not sep:
+        return None
+    return target, (after + tail).lstrip()   # ':' then \s* then (.*)
 
 
 def collapse_errors(errors: list[str]) -> list[str]:
@@ -17,9 +37,9 @@ def collapse_errors(errors: list[str]) -> list[str]:
     """
     groups: dict[str, list[str]] = defaultdict(list)
     for e in errors:
-        m = re.match(r"\s*\S+\s+(\S+):\s*(.*)", e)
-        if m:
-            groups[m.group(2)].append(m.group(1))
+        parsed = _split_denial(e)
+        if parsed:
+            groups[parsed[1]].append(parsed[0])
         else:
             groups[e].append("")
     out = []
