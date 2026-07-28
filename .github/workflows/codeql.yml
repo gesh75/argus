@@ -1,0 +1,49 @@
+# CodeQL semantic analysis — complements the Bandit gate in ci.yml.
+#
+# Why both: Bandit is an AST pattern matcher (it sees `subprocess.Popen(...)` and asks
+# "does this look dangerous?"). CodeQL does interprocedural taint tracking (it asks
+# "can an operator-supplied target string actually REACH this exec, and what sanitizes
+# it on the way?"). For a tool that builds argv from user-supplied targets and parses
+# untrusted tool output, that data-flow view catches a class of bug Bandit structurally
+# cannot see.
+#
+# Free on public repos. Alerts land in the Security tab, and Copilot Autofix proposes a
+# patch inline on the PR that introduced them.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly re-scan so newly published queries run against unchanged code.
+    - cron: "27 4 * * 1"
+
+permissions: {}
+
+jobs:
+  analyze:
+    name: CodeQL (python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      security-events: write   # required to upload results to the Security tab
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
+        with:
+          languages: python
+          build-mode: none        # Python needs no build step
+          # security-extended adds higher-recall security queries beyond the default
+          # suite — worth the extra runtime for a security tool.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
+        with:
+          category: "/language:python"
