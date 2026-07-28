@@ -11,6 +11,7 @@ starts with ``ARGUS_WEB_LIVE_ENABLED=1``; request JSON cannot select live or arm
 from __future__ import annotations
 
 import ipaddress
+import logging
 import os
 import threading
 from dataclasses import asdict
@@ -27,6 +28,8 @@ from .guardrail import Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
 from .sandbox import DockerSandbox, DryRunSandbox
+
+_LOG = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT.parent / "targets" / "docker-compose.yml"
@@ -248,8 +251,12 @@ def host(req: HostRequest) -> JSONResponse:
         return _error("live web execution is disabled", 403)
     try:
         guard = Guardrail(Policy.load(DEFAULT_POLICY))
-    except GuardrailError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+    except GuardrailError:
+        # Detail stays server-side: GuardrailError text can carry the audit key env name,
+        # its length, or audit-storage paths. Client gets a generic message (CodeQL:
+        # information exposure through an exception).
+        _LOG.exception("guardrail initialization failed")
+        return _error("guardrail initialization failed", 400)
     if not guard.check_target(req.target).allowed:
         return JSONResponse({"error": f"out-of-scope target refused: {req.target}"},
                             status_code=400)
@@ -282,8 +289,12 @@ def ad(req: ADRequest) -> JSONResponse:
         return _error("live web execution is disabled", 403)
     try:
         guard = Guardrail(Policy.load(DEFAULT_POLICY))
-    except GuardrailError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+    except GuardrailError:
+        # Detail stays server-side: GuardrailError text can carry the audit key env name,
+        # its length, or audit-storage paths. Client gets a generic message (CodeQL:
+        # information exposure through an exception).
+        _LOG.exception("guardrail initialization failed")
+        return _error("guardrail initialization failed", 400)
     if not guard.check_target(req.target).allowed:
         return JSONResponse({"error": f"out-of-scope target refused: {req.target}"},
                             status_code=400)
@@ -300,8 +311,12 @@ def ad(req: ADRequest) -> JSONResponse:
 def scan(req: ScanRequest) -> JSONResponse:
     try:
         guard = Guardrail(Policy.load(DEFAULT_POLICY))
-    except GuardrailError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+    except GuardrailError:
+        # Detail stays server-side: GuardrailError text can carry the audit key env name,
+        # its length, or audit-storage paths. Client gets a generic message (CodeQL:
+        # information exposure through an exception).
+        _LOG.exception("guardrail initialization failed")
+        return _error("guardrail initialization failed", 400)
     refused = [t for t in req.targets if not guard.check_target(t).allowed]
     if refused:
         return JSONResponse({"error": f"out-of-scope targets refused: {refused}"},
