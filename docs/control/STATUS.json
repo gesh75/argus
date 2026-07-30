@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T07:24:24Z",
+  "generated_at": "2026-07-30T07:33:53Z",
   "repository": "gesh75/argus",
   "current_main_sha": "79cb27269333a34ae6dac42897f9b15e99e4f667",
   "active_branch": "fix/argus-release-closeout",
-  "head_sha": "eb7897332d91020a4c89e77705049e3da2ad9599",
-  "source_commit": "eb7897332d91020a4c89e77705049e3da2ad9599",
+  "head_sha": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
+  "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
+  "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "release candidate; supervised alpha runtime",
@@ -41,7 +42,7 @@
     },
     "release_closeout_full": {
       "status": "passed",
-      "passed": 289
+      "passed": 292
     }
   },
   "lint_results": {
@@ -113,7 +114,7 @@
     "status": "verified source snapshot",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "eb7897332d91020a4c89e77705049e3da2ad9599"
+    "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2"
   },
   "completed_milestones": [
     {
@@ -209,7 +210,7 @@
     "no supported CLI or unattended loop"
   ],
   "security_evidence": [
-    "289-test hash-locked Python 3.12 release-closeout regression passed",
+    "292-test hash-locked Python 3.12 release-closeout regression passed",
     "51 focused release, V2, web, and audit tests passed",
     "123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed",
     "Ruff comparison found no new or changed findings; every changed Python file passed",
