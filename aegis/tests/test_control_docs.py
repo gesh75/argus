@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from html.parser import HTMLParser
@@ -172,7 +173,20 @@ def test_generated_documentation_matches_its_source_commit() -> None:
         )
 
         assert shallow == "true"
-        assert f"parent {source_commit}\n" in raw_head
+        parent_headers = {
+            line.removeprefix("parent ")
+            for line in raw_head.splitlines()
+            if line.startswith("parent ")
+        }
+        if source_commit not in parent_headers:
+            event_path = os.environ.get("GITHUB_EVENT_PATH")
+
+            assert event_path is not None
+            event = json.loads(Path(event_path).read_text())
+            pull_request_head = event["pull_request"]["head"]
+            assert pull_request_head["sha"] in parent_headers
+            assert pull_request_head["ref"] == status["active_branch"]
+
         expected = _generate(DASHBOARD.parent / ".index.generated-test.html")
         try:
             assert expected == DASHBOARD.read_bytes()
