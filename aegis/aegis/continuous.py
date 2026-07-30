@@ -35,7 +35,14 @@ class ContinuousRunner:
         agents: list[BaseAgent],
         graph: EvidenceGraph | None = None,
         persist_path: Path | None = None,
+        *,
+        experimental: bool = False,
     ):
+        if not experimental:
+            raise RuntimeError(
+                "V2 continuous mode is experimental and unsupported; "
+                "pass experimental=True only for isolated development"
+            )
         self.guardrail = guardrail
         self.agents = agents
         self.persist_path = persist_path or Path("data/evidence_graph.json")
