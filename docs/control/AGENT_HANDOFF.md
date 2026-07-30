@@ -163,7 +163,20 @@ Initial results:
   deploy, or enable unattended operation during this increment.
 - Pre-existing worktrees are evidence and are not cleanup targets.
 
+## Release-closeout continuation
+
+- Hash-locked Python 3.12 baseline: 279 collected, 279 passed.
+- GitHub baseline: no open pull request, issue #4 is the only open issue, no
+  open CodeQL alert, and main CI/CodeQL passed at the starting SHA.
+- Binding release decision: Path A—supported supervised V1, explicitly gated
+  experimental V2.
+- The independent V2 review clone was evidence only. None of its tracked or
+  untracked work was copied into the canonical branch.
+- The V1 audit backup remains preserved. No audit log, anchor, credential,
+  scan target, or deployment state was changed.
+
 ## Next exact action
 
-Verify the clean Python 3.12 baseline, then establish the claim-versus-code
-matrix from source, tests, GitHub, CI, and runtime evidence.
+Run the complete release gate in [`RUNBOOK.md`](RUNBOOK.md), publish the single
+pull request, obtain one read-only review after all gates are green, merge with
+head-SHA protection, and verify post-merge main.

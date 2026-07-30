@@ -1,56 +1,47 @@
-# Argus V2 — Continuous Self-Defense Sensor Fabric
+# Argus V2 Experimental Architecture
 
-> **Status: experimental architecture/scaffolding.** This document describes the V2 target
-> state, not current production behavior. Argus is not approved for unattended, production,
-> regulated, or 24/7 operation.
+> **Target architecture, not current product behavior.** V2 is explicitly
+> gated, has no supported CLI entry, and is not approved for unattended,
+> production, regulated, network-exposed, multi-user, or 24/7 operation.
 
-**Status:** Implementation started on branch `feature/argus-defender-fabric-v2`  
-**Principle (inviolable):** The agent proposes. The Guardrail disposes.
-
-## Elevated Purpose
-
-The target architecture is a **Continuous Authorized Self-Defense Sensor** for the gesh75
-Network AI Defender Fabric. That target has not yet been achieved.
-
-## High-Level Architecture
+## Current scaffold
 
 ```mermaid
-flowchart TB
-    subgraph Operator
-        CLI[CLI]
-        UI[Real-time UI<br/>React + Cytoscape]
-    end
-
-    subgraph Guardrail[7-Layer Fail-Closed Guardrail]
-        G1[Scope] --> G2[Tool Firewall] --> G3[Arg Hygiene]
-        G3 --> G4[Budget] --> G5[HMAC + Anchor] --> G6[Sanitizer]
-    end
-
-    subgraph Agents[Specialized Agents]
-        RA[Recon Agent]
-        HA[Host Agent]
-        ADA[AD/Identity Agent]
-        WA[Web/API Agent]
-        CA[Correlation Agent]
-        DA[Delta / Continuous Agent]
-    end
-
-    EG[(Evidence Graph<br/>NetworkX / Shared Store)]
-
-    CLI & UI --> Guardrail
-    Guardrail --> Agents
-    Agents --> EG
-    EG --> CA
-    CA --> Guardrail
-    DA --> Guardrail
+flowchart LR
+    OP["Development caller<br/>experimental=True"] --> CR["Gated ContinuousRunner"]
+    CR --> SA["Specialized-agent scaffolds"]
+    SA --> EG["In-memory EvidenceGraph"]
+    EG --> CA["Global-category correlation scaffold"]
+    EG --> JP["Direct JSON persistence scaffold"]
+    CR -. "no supported command" .-> X["Unsupported operation"]
 ```
 
-## Evidence Graph Model
-Every observation is a node. Attack paths are edges with proof tags (`observed` | `theoretical`).
+Current deficiencies are binding:
 
-## Continuous Mode
-Scheduled runs produce a delta graph: new paths, closed paths, changed confidence.
+- `BaseAgent.run_authorized()` authorizes but does not execute a collector or
+  record observations.
+- Recon proposes an empty target set; Host, AD, and Web propose nothing.
+- Targetless proposals are skipped and broad exceptions are suppressed.
+- Correlation is not asset-bound and path identifiers are random.
+- Persistence is not versioned, locked, atomic, checksummed, strict, or
+  recoverable.
+- New/changed/closed path semantics are not an operational lifecycle.
 
-## Safety Contract
-All agents still call `Guardrail.authorize()` before any collector runs.  
-No agent can ever bypass the 7 layers.
+## Target foundation
+
+```mermaid
+flowchart LR
+    OP["Explicit operator targets"] --> P["Typed proposal"]
+    P --> G["Existing fail-closed Guardrail"]
+    G --> C["Existing bounded collector"]
+    C --> O["Normalized observation"]
+    O --> EG["EvidenceGraph"]
+    EG --> AC["Asset-bound correlation"]
+    AC --> DI["Deterministic identity + dedupe"]
+    DI --> TP["Transactional persistence"]
+    TP --> D["Truthful delta report"]
+```
+
+No part of the target flow may bypass the existing guardrail, synthesize model
+shell commands, hide an exception, or default to loop mode. The binary exit
+criteria are in [`control/ROADMAP.md`](control/ROADMAP.md).

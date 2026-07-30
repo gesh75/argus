@@ -7,10 +7,10 @@
 
 # Argus
 
-> **Point it at an internal network. It reasons, chains, and adapts — read-only by default, behind a fail-closed guardrail.** An agentic AI pentester that turns raw recon into proof-annotated attack paths, strictly inside an authorized scope.
+> **Run supervised defensive assessments inside an explicitly authorized, separately verified lab.** Argus turns bounded read-only collection into proof-annotated findings behind a fail-closed guardrail.
 
-![tests](https://img.shields.io/badge/tests-139%20passing-brightgreen)
-![python](https://img.shields.io/badge/python-3.12-3776ab)
+![tests](https://img.shields.io/badge/tests-288%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.12%2B-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
 ![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
@@ -18,7 +18,7 @@
 
 Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus V1 is built around a deterministic guardrail and sandboxed collectors.** V2 agent, continuous, and evidence-graph modules are experimental scaffolding and are not a production continuous service.
 
-> **Maturity: alpha.** Use V1 only for supervised, explicitly authorized testing in a separately verified lab. It is not approved for unattended, network-exposed, multi-user, production, regulated, or 24/7 deployment. The web console is localhost-only and live web execution is disabled by default. See [Phase 1 safety boundaries](docs/PHASE1_SAFETY_BOUNDARY_IMPLEMENTATION.md).
+> **Maturity: supervised release candidate; alpha runtime.** V1 is the supported product. V2 continuous mode is experimental, explicitly gated, and unsupported. Argus is not approved for unattended, network-exposed, multi-user, production, regulated, or 24/7 deployment. The web console is localhost-only and live web execution is disabled by default.
 
 > 🛡️ **Authorized internal security testing only.** Ships with a fully-isolated, intentionally-vulnerable lab — run there first. Live use requires written authorization, a defined CIDR scope, and a regulated-systems exclusion list.
 
@@ -31,7 +31,7 @@ If you have watched an "AI security tool" hallucinate a critical finding with no
 - **The agent proposes, the guardrail disposes.** Every step the planner chooses is re-authorized by the guardrail: scope, tool firewall, budget, audit. Autonomy can never escape the authorized CIDR, arm an exploit, or touch a denied tool — no matter what the model "reasons."
 - **Read-only by default.** No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only. The one component that can emit beyond recon — the PoC verifier — is triple-gated to an isolated lab.
 - **Evidence or it didn't happen.** Every attack path is tagged `proof: observed` (every link backed by collected evidence) or `proof: theoretical` (plausible, not yet demonstrated). No silent guesses.
-- **Your data stays put.** Switchable AI brain: cloud Claude, local Ollama (data-safe, $0), or a fully offline heuristic engine that always works with no network.
+- **Operator-selected analysis.** Use cloud Claude only for approved non-sensitive data, local Ollama to avoid cloud egress, or the offline heuristic engine. Local processing reduces data movement; it is not a compliance guarantee.
 - **Tamper-evident.** Every authorize / exec / deny is written to an HMAC-SHA256 chained audit log; `argus audit` replays and verifies the whole chain.
 
 ## How it works
@@ -45,7 +45,7 @@ targets ─▶ guardrail ─▶ sandbox ─▶ collectors ─▶ AI triage ─�
                         observe → decide next action → AUTHORIZE → collect → repeat
 ```
 
-The agent only ever proposes a profile to run next; the guardrail authorizes it before anything executes. That single rule is what makes autonomy safe in a sensitive network.
+The bounded V1 planner proposes a profile; the guardrail authorizes it before a collector executes. This is an operator-invoked loop, not unattended autonomy.
 
 ## Architecture
 
@@ -109,7 +109,8 @@ flowchart LR
 
 ```bash
 cd aegis
-python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+python3.12 -m venv .venv && . .venv/bin/activate
+python -m pip install --require-hashes -r requirements.lock
 export PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32)   # required — refuses to run unaudited
 # optional AI: export ANTHROPIC_API_KEY=…   or   export AEGIS_OLLAMA_MODEL=qwen2.5:7b-instruct
 
@@ -155,7 +156,7 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Tests
 
-Current Phase 1 collection: **139 tests** on Python 3.12. Historical counts in the build log remain labeled as snapshots rather than current results.
+Current release-closeout collection: **288 tests** on Python 3.12. Historical counts in the build log and phase delivery reports remain labeled snapshots.
 
 ```bash
 cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
@@ -163,6 +164,9 @@ cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
 
 ## Docs
 
+- **[Release control dashboard](docs/index.html)** — generated status, roadmap, architecture, evidence, and warnings
+- **[Canonical project control](docs/control/PROJECT_CONTROL.md)** — claim-versus-code matrix and supported boundary
+- [Evidence-gated roadmap](docs/control/ROADMAP.md) · [decisions](docs/control/DECISIONS.md) · [runbook](docs/control/RUNBOOK.md)
 - [`aegis/docs/AGENTIC_ROADMAP.md`](aegis/docs/AGENTIC_ROADMAP.md) — the agentic design and module map
 - [`aegis/BUILD_AND_TEST_LOG.md`](aegis/BUILD_AND_TEST_LOG.md) — full build + live-validation record
 - [`aegis/SECURITY.md`](aegis/SECURITY.md) — the strict posture contract

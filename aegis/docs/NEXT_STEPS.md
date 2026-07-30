@@ -1,10 +1,9 @@
 # Argus — Recommended Next Steps
 
-Prioritized, best-practice-grounded roadmap for hardening the **process** around Argus
-(an agentic, read-only pentest orchestrator operated against a HIPAA/PHI network). Each
-item cites the external guidance it is grounded in. The guardrail architecture itself is
-already strong and maps cleanly onto the reference-monitor pattern these sources describe —
-so this list is about closing **process / operational** gaps, not redesigning what works.
+Historical hardening record for Argus. The active, evidence-gated roadmap is
+[`../../docs/control/ROADMAP.md`](../../docs/control/ROADMAP.md). Argus currently supports
+only supervised, explicitly authorized isolated-lab V1 assessment; it is not approved for
+regulated, production, unattended, or network-exposed operation.
 
 Legend: ✅ done in this pass · 🔭 tracked as a GitHub issue.
 
@@ -15,7 +14,8 @@ Legend: ✅ done in this pass · 🔭 tracked as a GitHub issue.
 ### ✅ 1. Security CI pipeline (`.github/workflows/ci.yml`)
 The repo previously had **zero CI** — for a tool that ships offensive capability and a
 `--sandbox local` host-exec path, that was the highest-leverage gap. Added blocking gates:
-- **pytest** — the 81-test suite is now enforced on every PR.
+- **pytest** — the Python 3.12 hash-locked suite is enforced on every PR. Current counts live
+  in `docs/control/STATUS.json`, not in this historical milestone description.
 - **Bandit (medium+)** — AST SAST for the `subprocess` / `shell` / partial-path classes
   this codebase lives in.
 - **pip-audit** — dependency CVEs (informational until deps are pinned, see P0.3).
@@ -46,11 +46,10 @@ as an artifact, and the `pip-audit` job is **blocking** against the locked tree 
 ## P1 — Audit-integrity & authorization, to best-of-breed
 
 ### 🔭 4. Move the HMAC signing key out-of-band from the tool runner
-The merged fix stopped the key leaking into *child* tools, but the **orchestrator process
-still holds the key** while it spawns offensive tools. Short term: enforce `SECURITY.md`'s
-own guidance in code — refuse to start if the audit key path is owned by the same uid as the
-runner or has loose perms (fail-to-start, don't bypass). Longer term: a tiny out-of-band
-signer the orchestrator talks to but never holds the key for.
+The merged child-environment fix stopped the key leaking into tool subprocesses, but the
+**orchestrator process still holds the key** while it coordinates collectors. The remaining
+work is a separately authenticated out-of-band signer with explicit availability, failure,
+recovery, operations, and rollback semantics. It is tracked in GitHub issue #4.
 
 **✅ Short-term landed:** `AuditLog` now **fails closed on a weak audit key** (`MIN_AUDIT_KEY_LEN
 = 32`) — a placeholder/short key can no longer sign a "tamper-evident" chain (`guardrail.py`).
@@ -127,6 +126,9 @@ enabled — so a human catches the misconfiguration at setup time rather than af
 WORM integration. The local JSON consistency anchor is not a remote-object adapter.
 
 ## Suggested sequencing (remaining)
-`P1.4 out-of-band signer` → design a separately authenticated external-anchor integration.
+
+Use the binary gates in `docs/control/ROADMAP.md`: close the supervised V1 release candidate,
+then separately design the out-of-band signer and a bounded operational V2 foundation. An
+independently administered external anchor remains a later higher-trust deployment gate.
 
 _Tracking issues are linked from each 🔭 item once opened._

@@ -1,56 +1,48 @@
-# Argus V2 Roadmap Status — Best-in-Class Free AI Defensive Intelligence Tool
+# Argus V2 Roadmap Status
 
-> **Status: roadmap and scaffold inventory, not production behavior.** “Complete” below means
-> the scoped scaffold or document exists; it does not mean the V2 continuous service is
-> integrated, operationally durable, or safe for production/regulated/24/7 deployment.
+> **Status: experimental scaffolding, explicitly gated and unsupported.**
+> The canonical active roadmap is [`control/ROADMAP.md`](control/ROADMAP.md).
 
-**Last updated:** 2026-07-20
+**Last reconciled:** 2026-07-30
 
-## Goal
-Long-term target: become a free, open-source continuous self-defense sensor with the controls
-required for separately authorized production and regulated-network evaluation.
+## Binding status
 
-## Phase Status
+Argus 1.0 uses Path A: supervised V1 is the release candidate. V2 remains
+importable for isolated development, but `ContinuousRunner` requires explicit
+`experimental=True`, no supported CLI command exposes it, and no unattended or
+scheduled operation is approved.
 
-### Phase 0 — Foundation (Complete)
-- [x] EvidenceGraph with proof tags
-- [x] ContinuousRunner skeleton
-- [x] Specialized agent framework under Guardrail
-- [x] Core V2 documentation
+## Verified scaffold inventory
 
-### Phase 1 — Intelligence (In Progress / Advanced)
-- [x] CorrelationAgent that walks EvidenceGraph and emits multi-step paths
-- [x] Observed vs theoretical proof discipline
-- [ ] Deeper LLM-assisted hypothesis generation (still Guardrail-gated)
-- [ ] BloodHound-style read-only AD path synthesis
+| Area | Classification | Release evidence |
+|---|---|---|
+| EvidenceGraph | Implemented but not release-grade | NetworkX graph and proof tags exist; path identity is random |
+| Specialized-agent framework | Scaffold only | base authorization hook exists; Host, AD, and Web agents propose nothing |
+| Recon agent | Scaffold only | initial proposal has no explicit target |
+| ContinuousRunner | Implemented but not integrated | targetless proposals are skipped; broad exceptions are suppressed; no collector lifecycle |
+| CorrelationAgent | Implemented but incorrect for operational use | globally combines categories instead of asset-bound relationships |
+| DeltaAgent | Scaffold only | set delta exists; closed-path lifecycle is not demonstrated |
+| Graph persistence | Scaffold only | direct JSON overwrite; no schema, lock, checksum, atomic durability, strict recovery, or typed timestamp restoration |
+| V2 UI | Documentation only | no interactive evidence/path product |
 
-### Phase 2 — Continuous Mode Hardening
-- [x] ContinuousRunner with delta reporting
-- [ ] Graph persistence between runs
-- [ ] Scheduled execution + alerting on new critical paths
-- [ ] History and trend views
+## Re-entry gate
 
-### Phase 3 — UI (Next High Priority)
-- [ ] Interactive attack-path graph (React + React Flow / Cytoscape)
-- [ ] Live agent activity stream
-- [ ] Delta timeline
-- [ ] Evidence drill-down
-- Current: Enhanced static architecture page exists
+The next V2 milestone must complete, in one bounded increment:
 
-### Phase 4 — Production Hardening
-- [ ] Out-of-band HMAC signer process
-- [ ] Real WORM / external anchor
-- [ ] Stronger sandbox isolation
+```text
+typed proposal
+→ explicit operator targets
+→ guardrail authorization
+→ existing collector execution
+→ normalized observations
+→ EvidenceGraph update
+→ asset-bound correlation
+→ deterministic path identity
+→ transactional persistence
+→ truthful new / changed / closed delta
+```
 
-### Phase 5 — Fabric Integration
-- [ ] Native hooks for netlog-ai, multivendor lab, Aegis validator
-- [ ] SIEM / ticketing emission for new critical paths
-
-### Phase 6 — Remediation Loop
-- [ ] Actionable remediation suggestions (still under Guardrail)
-- [ ] Optional PR / ticket generation
-
-## Design Principle (Never Broken)
-> The agent proposes. The Guardrail disposes.
-
-This is the unique advantage that allows Argus to be left running continuously.
+It must pass save→reload→rerun→delta tests, be idempotent, expose only a bounded
+dry-run-first command, and remain opt-in. Until that binary gate passes, V2 is
+not operational, autonomous, continuous, production-ready, regulated-ready, or
+safe to leave running.

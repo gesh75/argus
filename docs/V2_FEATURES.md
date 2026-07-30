@@ -1,107 +1,42 @@
-# Argus V2 — Complete Feature Documentation
+# Argus V2 Experimental Feature Inventory
 
-> **Status: experimental feature design.** Implemented V1 behavior, partial V2 scaffolding, and
-> future target behavior are described together below; this is not a production-readiness or
-> 24/7 deployment claim.
+> This is a claim-classified inventory. “Exists in source” does not mean
+> integrated, operational, or supported.
 
-**Extensive explanation of the V2 feature design with diagrams.**
+## Reused operational V1 controls
 
----
+- Fail-closed scope, tool, argument, budget, time, audit, and output controls.
+- Docker sandbox by default and exact approval for the local exception.
+- Network, host, AD, and web collectors.
+- Optional Claude, local Ollama, and offline heuristic analysis.
+- Phase 2A transactional audit log and local non-WORM consistency anchor.
 
-## 1. 7-Layer Fail-Closed Guardrail (The Sacred Core)
+These controls are operational in supervised V1. Their existence does not
+complete the V2 lifecycle.
 
-```mermaid
-flowchart LR
-    A[Agent Proposal] --> B[1. Scope Guard]
-    B --> C[2. Tool Firewall]
-    C --> D[3. Arg Hygiene]
-    D --> E[4. Budget / Time]
-    E --> F[5. HMAC + Anchor Audit]
-    F --> G[6. Output Sanitizer]
-    G --> H{Authorized?}
-    H -- No --> I[Deny + Audit Log]
-    H -- Yes --> J[Execute in Sandbox]
-```
+## Experimental V2 modules
 
-**Why it exists**  
-Autonomy without a hard reference monitor is dangerous near regulated systems. Every single action is re-authorized. Ambiguity always equals denial. This is the reason Argus can be left running as a continuous sensor.
+| Module | What exists | What is missing |
+|---|---|---|
+| `evidence.py` | NetworkX graph, observations, proof tags | deterministic identity, asset model, release-grade persistence |
+| `agents/base.py` | proposal interface and authorization call | collector execution and observation recording |
+| `agents/recon.py` | one initial proposal | explicit targets and normalized collector adapter |
+| `agents/host.py`, `ad.py`, `web.py` | class skeletons | proposals and execution lifecycle |
+| `agents/correlation.py` | category-based theoretical paths | asset relationships, dedupe, deterministic IDs |
+| `agents/delta.py` | node-set subtraction | truthful path lifecycle and durable baseline |
+| `continuous.py` | gated cycle/loop scaffold | supported CLI, error contract, integration, safe scheduling |
+| `persistence.py` | direct JSON save/load | schema, lock, atomic replace, checksum, strict decode, corruption recovery |
 
----
+## Explicit non-features
 
-## 2. Evidence Graph
+- no supported continuous command;
+- no unattended or 24/7 service;
+- no production or regulated readiness;
+- no interactive V2 evidence/path UI;
+- no out-of-band signer;
+- no external/WORM anchor;
+- no demonstrated closed-path lifecycle;
+- no claim that local Ollama alone makes regulated data handling compliant.
 
-Central shared knowledge plane used by all agents.
-
-- Nodes = Observations (network, host, AD, web, exposure, segmentation, ai-service, path)
-- Edges = causal / chaining relationships
-- Every attack path carries a mandatory proof tag: `observed` or `theoretical`
-
-This is the primary defense against LLM hallucination.
-
----
-
-## 3. Specialized Multi-Agent System
-
-| Agent              | Responsibility                                   | Under Guardrail |
-|--------------------|--------------------------------------------------|-----------------|
-| ReconAgent         | Network scanning, segmentation, shadow-AI        | Yes             |
-| HostAgent          | Linux & Windows read-only audits                 | Yes             |
-| ADAgent            | Anonymous LDAP / identity surface                | Yes             |
-| WebAgent           | Web / API surface discovery                      | Yes             |
-| CorrelationAgent   | Builds multi-step attack paths from the graph    | Yes             |
-| DeltaAgent         | Continuous mode change detection                 | Yes             |
-
----
-
-## 4. Continuous / Delta Mode
-
-```mermaid
-sequenceDiagram
-    participant CS as ContinuousSensor
-    participant GR as Guardrail
-    participant EG as EvidenceGraph
-
-    loop Every interval
-        CS->>GR: authorize proposed actions
-        GR-->>CS: allowed / denied + audit
-        CS->>EG: write new Observations
-        CS->>CS: compute delta vs previous graph
-        CS->>CS: emit new_paths / closed_paths
-    end
-```
-
-Turns Argus from a one-shot scanner into a true continuous self-defense sensor for the gesh75 fabric.
-
----
-
-## 5. Proof Annotation Discipline
-
-Every attack path must be tagged:
-
-- **observed** → every link is backed by collected evidence
-- **theoretical** → plausible but not yet demonstrated
-
-This single rule is the antidote to hallucinated findings.
-
----
-
-## 6. Privacy Options
-
-- Claude (cloud) for non-sensitive work
-- Local Ollama for PHI / regulated networks
-- Fully offline heuristic engine as fallback
-
----
-
-## 7. Tamper-Evident Audit
-
-HMAC-SHA256 chained log + optional external WORM anchor.  
-The entire history can be verified with `argus audit`.
-
----
-
-## Design Principle (Never Broken)
-
-> **The agent proposes. The Guardrail disposes.**
-
-This is what makes Argus safe enough to be the continuous eyes of the gesh75 Network AI Defender Fabric.
+The complete next milestone is specified in
+[`control/ROADMAP.md`](control/ROADMAP.md).
