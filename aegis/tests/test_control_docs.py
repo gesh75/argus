@@ -8,6 +8,7 @@ import subprocess
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +58,39 @@ def _generate(output: Path) -> bytes:
         check=True,
     )
     return output.read_bytes()
+
+
+def _parent_headers(raw_commit: str) -> set[str]:
+    return {
+        line.removeprefix("parent ")
+        for line in raw_commit.splitlines()
+        if line.startswith("parent ")
+    }
+
+
+def _validate_shallow_source_topology(
+    *,
+    status: dict[str, Any],
+    raw_head: str,
+    current_head: str,
+    event: dict[str, Any],
+) -> None:
+    parents = _parent_headers(raw_head)
+    source_commit = status["source_commit"]
+    if source_commit in parents:
+        return
+
+    pull_request = event.get("pull_request")
+    if pull_request is not None:
+        pull_request_head = pull_request["head"]
+        assert pull_request_head["sha"] in parents
+        assert pull_request_head["ref"] == status["active_branch"]
+        return
+
+    assert event["ref"] == "refs/heads/main"
+    assert event["after"] == current_head
+    assert status["current_main_sha"] in parents
+    assert len(parents) == 2
 
 
 def test_dashboard_generation_is_byte_identical(tmp_path: Path) -> None:
@@ -120,6 +154,21 @@ def test_dashboard_contains_every_required_control_section() -> None:
     }
 
     assert all(section in html for section in required_sections)
+    assert "Generation HEAD" in html
+    assert "Active HEAD" not in html
+
+
+def test_v2_docs_match_failure_propagation_behavior() -> None:
+    paths = [
+        REPO_ROOT / "docs" / "control" / "PROJECT_CONTROL.md",
+        REPO_ROOT / "docs" / "V2_ROADMAP_STATUS.md",
+        REPO_ROOT / "docs" / "V2_ARCHITECTURE.md",
+    ]
+
+    for path in paths:
+        content = path.read_text()
+        assert "broad exceptions are suppressed" not in content
+        assert "collector failures" in content
 
 
 def test_dashboard_internal_links_resolve() -> None:
@@ -148,6 +197,50 @@ def test_readme_links_to_control_pack_and_dashboard() -> None:
     assert "docs/index.html" in readme
 
 
+def test_shallow_source_topology_accepts_pull_request_merge() -> None:
+    status = {
+        "source_commit": "source",
+        "current_main_sha": "base",
+        "active_branch": "fix/release",
+    }
+    raw_head = "tree tree\nparent base\nparent carrier\n\nPR merge"
+    event = {
+        "pull_request": {
+            "head": {
+                "ref": "fix/release",
+                "sha": "carrier",
+            }
+        }
+    }
+
+    _validate_shallow_source_topology(
+        status=status,
+        raw_head=raw_head,
+        current_head="synthetic-merge",
+        event=event,
+    )
+
+
+def test_shallow_source_topology_accepts_main_push_merge() -> None:
+    status = {
+        "source_commit": "source",
+        "current_main_sha": "base",
+        "active_branch": "fix/release",
+    }
+    raw_head = "tree tree\nparent base\nparent carrier\n\nMerged PR"
+    event = {
+        "ref": "refs/heads/main",
+        "after": "merge",
+    }
+
+    _validate_shallow_source_topology(
+        status=status,
+        raw_head=raw_head,
+        current_head="merge",
+        event=event,
+    )
+
+
 def test_generated_documentation_matches_its_source_commit() -> None:
     status = json.loads(STATUS.read_text())
     source_commit = status["source_commit"]
@@ -171,21 +264,21 @@ def test_generated_documentation_matches_its_source_commit() -> None:
             cwd=REPO_ROOT,
             text=True,
         )
+        current_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).strip()
+        event_path = os.environ.get("GITHUB_EVENT_PATH")
+        event = json.loads(Path(event_path).read_text()) if event_path else {}
 
         assert shallow == "true"
-        parent_headers = {
-            line.removeprefix("parent ")
-            for line in raw_head.splitlines()
-            if line.startswith("parent ")
-        }
-        if source_commit not in parent_headers:
-            event_path = os.environ.get("GITHUB_EVENT_PATH")
-
-            assert event_path is not None
-            event = json.loads(Path(event_path).read_text())
-            pull_request_head = event["pull_request"]["head"]
-            assert pull_request_head["sha"] in parent_headers
-            assert pull_request_head["ref"] == status["active_branch"]
+        _validate_shallow_source_topology(
+            status=status,
+            raw_head=raw_head,
+            current_head=current_head,
+            event=event,
+        )
 
         expected = _generate(DASHBOARD.parent / ".index.generated-test.html")
         try:
@@ -202,8 +295,8 @@ def test_generated_documentation_matches_its_source_commit() -> None:
         ).strip()
     )
 
-    assert distance in {0, 1}
-    if distance == 1:
+    assert distance in {0, 1, 2}
+    if distance:
         changed = set(
             subprocess.check_output(
                 ["git", "diff", "--name-only", f"{source_commit}..HEAD"],
@@ -212,6 +305,20 @@ def test_generated_documentation_matches_its_source_commit() -> None:
             ).splitlines()
         )
         assert changed == SNAPSHOT_FILES
+    if distance == 2:
+        first_parent = subprocess.check_output(
+            ["git", "rev-parse", "HEAD^1"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).strip()
+        feature_source = subprocess.check_output(
+            ["git", "rev-parse", "HEAD^2^"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).strip()
+
+        assert first_parent == status["current_main_sha"]
+        assert feature_source == source_commit
 
     for relative_path in SOURCE_FILES:
         committed = subprocess.check_output(

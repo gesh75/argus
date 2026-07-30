@@ -420,7 +420,7 @@ def render(status: Mapping[str, Any]) -> str:
       </div>
       <div class="status-grid">
         <article class="status-card"><span>Current main</span><strong><code>{_e(status["current_main_sha"])}</code></strong></article>
-        <article class="status-card"><span>Active HEAD</span><strong><code>{_e(status["head_sha"])}</code></strong></article>
+        <article class="status-card"><span>Generation HEAD</span><strong><code>{_e(status["head_sha"])}</code></strong></article>
         <article class="status-card"><span>Source commit</span><strong><code>{_e(status["source_commit"])}</code></strong></article>
         <article class="status-card"><span>CodeQL</span><strong>{_e(status["codeql"]["status"])}</strong>{_badge(status["codeql"]["status"])}</article>
       </div>

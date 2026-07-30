@@ -19,7 +19,7 @@ scheduled operation is approved.
 | EvidenceGraph | Implemented but not release-grade | NetworkX graph and proof tags exist; path identity is random |
 | Specialized-agent framework | Scaffold only | base authorization hook exists; Host, AD, and Web agents propose nothing |
 | Recon agent | Scaffold only | initial proposal has no explicit target |
-| ContinuousRunner | Implemented but not integrated | targetless proposals are skipped; broad exceptions are suppressed; no collector lifecycle |
+| ContinuousRunner | Implemented but not integrated | targetless proposals are skipped; broad exception suppression was removed and collector failures propagate; no collector lifecycle |
 | CorrelationAgent | Implemented but incorrect for operational use | globally combines categories instead of asset-bound relationships |
 | DeltaAgent | Scaffold only | set delta exists; closed-path lifecycle is not demonstrated |
 | Graph persistence | Scaffold only | direct JSON overwrite; no schema, lock, checksum, atomic durability, strict recovery, or typed timestamp restoration |

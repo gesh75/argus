@@ -76,7 +76,7 @@ gate for a future V2 foundation.
 | V2 `BaseAgent.run_authorized()` lifecycle | Scaffold only | It authorizes but does not execute a collector or record observations | Unsupported |
 | V2 `ReconAgent` | Scaffold only | Initial proposal has an empty target list | Unsupported |
 | V2 host, AD, and web specialized agents | Scaffold only | `propose()` returns no proposals | Unsupported |
-| V2 `ContinuousRunner` | Implemented but not integrated, now explicitly gated | Skips targetless proposals, suppresses broad exceptions, and has no supported CLI entry | Experimental and unsupported |
+| V2 `ContinuousRunner` | Implemented but not integrated, now explicitly gated | Skips targetless proposals, propagates collector failures, and has no supported CLI entry | Experimental and unsupported |
 | V2 EvidenceGraph | Implemented but not release-grade | In-memory NetworkX graph with random path identifiers | Experimental |
 | V2 correlation | Implemented but incorrect for operational use | Combines global categories rather than asset-bound relationships | Experimental |
 | V2 graph persistence | Scaffold only | Direct JSON overwrite; no schema, lock, checksum, atomic durability, or recovery contract | Experimental |
@@ -136,4 +136,3 @@ Every required release gate must pass before merge.
 Execute the binary `NOW` gate in [`ROADMAP.md`](ROADMAP.md), publish the single
 release-closeout pull request, require green CI/CodeQL plus one read-only
 review, merge with head-SHA protection, and verify post-merge main.
-

@@ -21,7 +21,8 @@ Current deficiencies are binding:
 - `BaseAgent.run_authorized()` authorizes but does not execute a collector or
   record observations.
 - Recon proposes an empty target set; Host, AD, and Web propose nothing.
-- Targetless proposals are skipped and broad exceptions are suppressed.
+- Targetless proposals are skipped; broad exception suppression was removed,
+  and collector failures now propagate.
 - Correlation is not asset-bound and path identifiers are random.
 - Persistence is not versioned, locked, atomic, checksummed, strict, or
   recoverable.
