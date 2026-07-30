@@ -1,171 +1,389 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Argus — Architecture</title>
-<style>
-  :root{--bg:#0a0e14;--panel:#11161f;--line:#222b38;--fg:#e6edf3;--mut:#8b949e;
-        --blue:#58a6ff;--green:#3fb950;--red:#f85149;--amber:#e3b341;--purple:#bc8cff}
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;font:15px/1.65 -apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);
-    background:radial-gradient(1100px 600px at 75% -5%,rgba(88,166,255,.10),transparent 60%),
-               radial-gradient(900px 500px at 0% 100%,rgba(63,185,80,.08),transparent 55%),var(--bg);
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
-  header.hero{padding:90px 0 50px;text-align:center}
-  .badge{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:5px 16px;margin-bottom:22px}
-  h1{font-size:54px;margin:0 0 14px;line-height:1.05;font-weight:800;
-    background:linear-gradient(100deg,#58a6ff,#3fb950 60%,#bc8cff);
-    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-    background-size:200% auto;animation:shine 6s linear infinite}
-  @keyframes shine{to{background-position:200% center}}
-  .sub{color:var(--mut);font-size:19px;max-width:660px;margin:0 auto}
-  .pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:26px}
-  .pill{font-size:12px;border:1px solid var(--line);border-radius:14px;padding:5px 12px;color:var(--fg);
-    background:var(--panel)}
-  section{padding:46px 0;border-top:1px solid var(--line)}
-  h2{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:0 0 4px}
-  h2 b{color:var(--fg)} .lead{font-size:22px;font-weight:700;margin:0 0 26px}
-  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
-  .reveal.in{opacity:1;transform:none}
-  /* pipeline */
-  .pipe{display:flex;flex-direction:column;gap:14px}
-  .layer{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    padding:18px 20px;display:flex;align-items:center;gap:18px;overflow:hidden}
-  .layer::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
-  .layer.l1::before{background:var(--blue)} .layer.l2::before{background:var(--red)}
-  .layer.l3::before{background:var(--amber)} .layer.l4::before{background:var(--green)}
-  .layer.l5::before{background:var(--purple)} .layer.l6::before{background:var(--blue)}
-  .lnum{font-size:12px;color:var(--mut);min-width:62px}
-  .ltitle{font-weight:700;min-width:230px}
-  .ldesc{color:var(--mut);font-size:13.5px}
-  .flowdot{width:9px;height:9px;border-radius:50%;background:var(--green);margin:8px auto;
-    box-shadow:0 0 10px var(--green);animation:fall 2.4s linear infinite;opacity:.0}
-  @keyframes fall{0%{opacity:0;transform:translateY(-6px)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(6px)}}
-  /* guardrail grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
-    transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
-  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.4);border-color:#324053}
-  .card .n{font-size:11px;color:var(--mut)} .card h3{margin:6px 0 6px;font-size:15px}
-  .card p{margin:0;color:var(--mut);font-size:13px}
-  .kpis{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 26px;text-align:center;min-width:140px}
-  .kpi b{display:block;font-size:34px;font-weight:800}
-  .kpi.b b{color:var(--blue)} .kpi.g b{color:var(--green)} .kpi.p b{color:var(--purple)} .kpi.a b{color:var(--amber)}
-  .kpi span{font-size:12px;color:var(--mut)}
-  .sec{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:10px;padding:14px 18px;
-    margin:10px 0;background:var(--panel);display:flex;gap:12px;align-items:flex-start}
-  .sec .chk{color:var(--green);font-weight:800} .sec b{color:var(--fg)} .sec span{color:var(--mut);font-size:13.5px}
-  footer{padding:50px 0 80px;text-align:center;color:var(--mut);font-size:13px}
-  code{background:#0a0e14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px}
-  @media (max-width:760px){h1{font-size:38px} .ltitle{min-width:0} .layer{flex-wrap:wrap;gap:8px}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Argus release control dashboard">
+  <title>Argus · Release Control</title>
+  <style>
+    :root {
+      --bg: #071017;
+      --panel: #0d1b24;
+      --panel-2: #112631;
+      --line: #28414e;
+      --text: #edf7f8;
+      --muted: #9eb2ba;
+      --cyan: #4cd7e8;
+      --green: #65dc9a;
+      --amber: #f6c760;
+      --red: #ff7b72;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .32);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 80% -10%, rgba(76, 215, 232, .13), transparent 34rem),
+        radial-gradient(circle at -10% 40%, rgba(101, 220, 154, .08), transparent 32rem),
+        var(--bg);
+      font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    a { color: var(--cyan); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .skip {
+      position: absolute;
+      left: -9999px;
+    }
+    .skip:focus {
+      left: 1rem;
+      top: 1rem;
+      z-index: 20;
+      padding: .7rem 1rem;
+      background: var(--text);
+      color: var(--bg);
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      min-height: 64px;
+      padding: .8rem clamp(1rem, 4vw, 4rem);
+      border-bottom: 1px solid rgba(76, 215, 232, .2);
+      background: rgba(7, 16, 23, .88);
+      backdrop-filter: blur(16px);
+    }
+    .brand { font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .brand i { color: var(--cyan); font-style: normal; }
+    nav { display: flex; gap: 1rem; margin-left: auto; }
+    nav a { color: var(--muted); text-decoration: none; font-size: .85rem; }
+    .hero {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: clamp(4rem, 8vw, 8rem) clamp(1rem, 4vw, 4rem) 3rem;
+    }
+    .eyebrow {
+      color: var(--cyan);
+      font: 700 .75rem/1.2 ui-monospace, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 18ch;
+      margin: .7rem 0 1rem;
+      font-size: clamp(2.6rem, 7vw, 6.6rem);
+      line-height: .95;
+      letter-spacing: -.06em;
+    }
+    .lede { max-width: 75ch; color: var(--muted); font-size: 1.08rem; }
+    .warning {
+      margin-top: 2rem;
+      padding: 1rem 1.2rem;
+      border: 1px solid rgba(246, 199, 96, .45);
+      border-left: 4px solid var(--amber);
+      border-radius: .7rem;
+      background: rgba(246, 199, 96, .07);
+      color: #ffe4a3;
+    }
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 clamp(1rem, 4vw, 4rem) 6rem;
+    }
+    section { padding: 3rem 0; border-top: 1px solid var(--line); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(12rem, .7fr) minmax(18rem, 1.3fr);
+      gap: 2rem;
+      margin-bottom: 1.8rem;
+    }
+    h2 { margin: 0; font-size: clamp(1.6rem, 3vw, 2.5rem); letter-spacing: -.035em; }
+    .section-head p { margin: .25rem 0 0; color: var(--muted); }
+    .status-grid, .evidence-grid, .milestone-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: .9rem;
+    }
+    .status-card, .evidence-card, .milestone {
+      padding: 1.1rem;
+      border: 1px solid var(--line);
+      border-radius: .8rem;
+      background: linear-gradient(160deg, var(--panel-2), var(--panel));
+      box-shadow: var(--shadow);
+    }
+    .status-card span, .evidence-card span {
+      display: block;
+      color: var(--muted);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .status-card strong, .evidence-card strong {
+      display: block;
+      margin: .4rem 0 .7rem;
+      overflow-wrap: anywhere;
+    }
+    .badge {
+      display: inline-block;
+      padding: .2rem .5rem;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font: 700 .68rem/1.2 ui-monospace, monospace;
+      text-transform: uppercase;
+    }
+    .badge.ok { color: var(--green); }
+    .badge.warn { color: var(--amber); }
+    .badge.bad { color: var(--red); }
+    .two-column, .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .boundary, .flow-panel {
+      padding: 1.2rem;
+      border: 1px solid var(--line);
+      border-radius: .8rem;
+      background: var(--panel);
+    }
+    .boundary h3, .flow-panel h3 { margin-top: 0; }
+    li { margin: .45rem 0; }
+    .roadmap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .8rem;
+    }
+    .roadmap-column {
+      min-height: 230px;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--muted);
+      border-radius: .8rem;
+      background: var(--panel);
+    }
+    .state-now { border-top-color: var(--green); }
+    .state-next { border-top-color: var(--cyan); }
+    .state-later { border-top-color: var(--amber); }
+    .state-deferred { border-top-color: #77838a; }
+    .roadmap-column h3 { margin: 0; font-family: ui-monospace, monospace; }
+    .roadmap-column ul { padding-left: 1.2rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { padding: .85rem; border-bottom: 1px solid var(--line); text-align: left; }
+    th { width: 22%; }
+    .flow { list-style: none; padding: 0; margin: 0; }
+    .flow li {
+      display: grid;
+      grid-template-columns: 2.5rem 1fr;
+      gap: .6rem;
+      align-items: start;
+      padding: .7rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .step-index { color: var(--cyan); font: 700 .75rem/1.5 ui-monospace, monospace; }
+    .milestone header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: .75rem;
+    }
+    .milestone h3 { margin-bottom: 0; }
+    .next-action {
+      padding: 1.5rem;
+      border-radius: .8rem;
+      background: linear-gradient(120deg, rgba(76, 215, 232, .13), rgba(101, 220, 154, .08));
+      border: 1px solid var(--cyan);
+      font-size: 1.05rem;
+    }
+    .control-links { display: flex; flex-wrap: wrap; gap: .65rem; }
+    .control-link {
+      padding: .65rem .85rem;
+      border: 1px solid var(--line);
+      border-radius: .55rem;
+      background: var(--panel);
+      text-decoration: none;
+    }
+    footer {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem clamp(1rem, 4vw, 4rem) 4rem;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+    @media (max-width: 900px) {
+      nav { display: none; }
+      .section-head, .two-column, .flow-grid { grid-template-columns: 1fr; }
+      .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .roadmap-grid { grid-template-columns: 1fr; }
+      th, td { display: block; width: 100%; }
+      tr { display: block; padding: .5rem 0; border-bottom: 1px solid var(--line); }
+      th, td { border: 0; padding: .25rem .6rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
 </head>
 <body>
-<header class="hero wrap">
-  <div class="badge">Authorized internal security platform</div>
-  <h1>Argus</h1>
-  <p class="sub">An AI-driven, sandbox-first penetration testing platform that discovers
-    security gaps across the network, Linux/Windows hosts, and Active Directory — strictly
-    read-only, fully audited, and safe for sensitive internal environments.</p>
-  <div class="pills">
-    <span class="pill">🛡️ 7-layer guardrail</span>
-    <span class="pill">🧠 Claude · local Gemma · offline</span>
-    <span class="pill">🔬 network · host · AD</span>
-    <span class="pill">🏥 HIPAA-aware</span>
-    <span class="pill">📝 HMAC-audited</span>
+  <a class="skip" href="#project-status">Skip to project status</a>
+  <header class="topbar">
+    <div class="brand"><i>Argus</i> / Release Control</div>
+    <nav aria-label="Dashboard">
+      <a href="#project-status">Status</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#operations">Operations</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">Evidence-gated defensive engineering</div>
+    <h1>Supervised V1. Experimental V2.</h1>
+    <p class="lede"><strong>Release target:</strong> Argus 1.0 supervised defensive assessment release candidate.
+      Argus is a fail-closed defensive assessment orchestrator for explicitly
+      authorized, separately verified isolated labs.</p>
+    <div class="warning"><strong>Maturity warning:</strong> release candidate; supervised alpha runtime.
+      No unattended, production, regulated, network-exposed, multi-user, or 24/7
+      operation is supported. The local JSON anchor is not WORM.</div>
   </div>
-</header>
 
-<section class="wrap reveal">
-  <h2><b>The pipeline</b> — how a scan flows</h2>
-  <p class="lead">Every action descends through the same layered path. Nothing reaches a target without passing the guardrail.</p>
-  <div class="pipe">
-    <div class="layer l1"><span class="lnum">Layer 1</span><span class="ltitle">🎛️ Operator Console</span><span class="ldesc">CLI + FastAPI GUI. Pick targets, profile, and AI brain.</span></div>
-    <div class="flowdot" style="animation-delay:.0s"></div>
-    <div class="layer l2"><span class="lnum">Layer 2</span><span class="ltitle">🛡️ Guardrail (fail-closed)</span><span class="ldesc">Scope canonicalization · tool/command catalog · budget · HMAC audit.</span></div>
-    <div class="flowdot" style="animation-delay:.4s"></div>
-    <div class="layer l3"><span class="lnum">Layer 3</span><span class="ltitle">📦 Sandbox</span><span class="ldesc">Isolated <code>--internal</code> Docker net · argv-only exec · OS timeouts.</span></div>
-    <div class="flowdot" style="animation-delay:.8s"></div>
-    <div class="layer l4"><span class="lnum">Layer 4</span><span class="ltitle">🔬 Collectors</span><span class="ldesc">16 network tools · Linux/SSH · Windows/WinRM · AD/LDAP — all read-only.</span></div>
-    <div class="flowdot" style="animation-delay:1.2s"></div>
-    <div class="layer l5"><span class="lnum">Layer 5</span><span class="ltitle">🧠 AI Analysis</span><span class="ldesc">Cost-aware triage → correlation. CVSS · MITRE ATT&CK · attack paths.</span></div>
-    <div class="flowdot" style="animation-delay:1.6s"></div>
-    <div class="layer l6"><span class="lnum">Layer 6</span><span class="ltitle">📊 Reporting</span><span class="ldesc">Platform mitigation playbooks → CSV/MD/JSON into the the ticket tracker.</span></div>
-  </div>
-</section>
+  <main>
+    <section id="project-status">
+      <div class="section-head">
+        <div><div class="eyebrow">Control plane</div><h2>Project status</h2></div>
+        <p>Repository, release, and evidence state from the deterministic
+          machine-readable control snapshot.</p>
+      </div>
+      <div class="status-grid">
+        <article class="status-card"><span>Repository</span><strong>gesh75/argus</strong><span class="badge warn">tracked</span></article>
+        <article class="status-card"><span>Release target</span><strong>Argus 1.0 supervised defensive assessment release candidate</strong><span class="badge warn">in progress</span></article>
+        <article class="status-card"><span>Branch</span><strong>fix/argus-release-closeout</strong><span class="badge warn">canonical</span></article>
+        <article class="status-card"><span>Open PRs</span><strong>1</strong><span class="badge warn">review</span></article>
+        <article class="status-card"><span>Open issues</span><strong>1</strong><span class="badge warn">tracked</span></article>
+        <article class="status-card"><span>Release blockers</span><strong>0</strong><span class="badge warn">clear</span></article>
+      </div>
+    </section>
 
-<section class="wrap reveal">
-  <h2><b>The guardrail</b> — 7 layers, fail-closed</h2>
-  <p class="lead">Borrowed from Phantom's defense model, hardened by adversarial review.</p>
-  <div class="grid">
-    <div class="card"><div class="n">Layer 1</div><h3>Scope guard</h3><p>Targets canonicalized (decimal/hex/octal) then <code>subnet_of</code> the allowed range. Default-deny on anything unparseable.</p></div>
-    <div class="card"><div class="n">Layer 2</div><h3>Tool / command firewall</h3><p>Closed allowlists. Per-tool dangerous-flag denial. Exploit tools armed-only.</p></div>
-    <div class="card"><div class="n">Layer 3</div><h3>Sandbox isolation</h3><p>Argv-only exec in an internet-isolated Docker network. No shell, no host route.</p></div>
-    <div class="card"><div class="n">Layer 4–5</div><h3>Budget &amp; time</h3><p>Wall-clock + token + dollar ceilings on a monotonic ledger. Kill on breach.</p></div>
-    <div class="card"><div class="n">Layer 6</div><h3>HMAC audit</h3><p>SHA-256 chained, tamper-evident log of every authorize/exec/deny.</p></div>
-    <div class="card"><div class="n">Layer 7</div><h3>Output sanitizer</h3><p>Redacts secrets/PHI (passwords, SSN, MRN); tool output treated as untrusted.</p></div>
-  </div>
-</section>
+    <section id="git-ci">
+      <div class="section-head">
+        <div><div class="eyebrow">Repository truth</div><h2>Git and CI state</h2></div>
+        <p>Exact immutable identifiers and the current security-analysis state.</p>
+      </div>
+      <div class="status-grid">
+        <article class="status-card"><span>Current main</span><strong><code>79cb27269333a34ae6dac42897f9b15e99e4f667</code></strong></article>
+        <article class="status-card"><span>Active HEAD</span><strong><code>f16f61a6bbef5aaf322cbdaaf6039199a078cd99</code></strong></article>
+        <article class="status-card"><span>Source commit</span><strong><code>f16f61a6bbef5aaf322cbdaaf6039199a078cd99</code></strong></article>
+        <article class="status-card"><span>CodeQL</span><strong>baseline-passed</strong><span class="badge ok">baseline-passed</span></article>
+      </div>
+    </section>
 
-<section class="wrap reveal">
-  <h2><b>Coverage</b> — what Argus sees</h2>
-  <p class="lead">Network outside-in, plus credentialed host and directory depth.</p>
-  <div class="grid">
-    <div class="card"><div class="n">Network</div><h3>16 read-only tools</h3><p>nmap · masscan · nuclei · sslscan · whatweb · enum4linux · smbmap · snmp · ldapsearch — 9 profiles.</p></div>
-    <div class="card"><div class="n">Host · Linux</div><h3>SSH audit</h3><p>SUID/GTFOBins · NOPASSWD sudo · weak sshd · world-writable · Lynis.</p></div>
-    <div class="card"><div class="n">Host · Windows</div><h3>WinRM audit</h3><p>SMB signing · AlwaysInstallElevated · unquoted services · WDigest · UAC · LAPS.</p></div>
-    <div class="card"><div class="n">Active Directory</div><h3>LDAP / AD</h3><p>Anonymous bind · RootDSE disclosure · user enumeration. PingCastle/BloodHound hooks.</p></div>
-  </div>
-</section>
+    <section id="boundaries">
+      <div class="section-head">
+        <div><div class="eyebrow">Release contract</div><h2>Release target</h2></div>
+        <p>What this candidate supports—and what it explicitly does not claim.</p>
+      </div>
+      <div class="two-column">
+        <article class="boundary"><h3>Supported deployment boundary</h3><ul><li>supervised, explicitly authorized isolated-lab assessment</li><li>Python 3.12+ POSIX macOS/Linux controller</li><li>V1 CLI with Docker sandbox by default</li><li>localhost-only FastAPI console with server-owned live mode</li><li>Phase 2A transactional audit diagnostics and local consistency anchor</li></ul></article>
+        <article class="boundary"><h3>Unsupported deployment modes</h3><ul><li>unattended, scheduled, or 24/7 operation</li><li>V2 continuous mode as a supported product</li><li>production or regulated deployment</li><li>network-exposed or multi-user service</li><li>local JSON anchor represented as WORM</li><li>Windows-hosted audit writing</li></ul></article>
+      </div>
+    </section>
 
-<section class="wrap reveal">
-  <h2><b>The brain</b> — switchable, cost-aware</h2>
-  <p class="lead">One scan, three interchangeable engines — pick per run.</p>
-  <div class="kpis">
-    <div class="kpi b"><b>Claude</b><span>Haiku → Sonnet<br>cloud, deepest reasoning</span></div>
-    <div class="kpi g"><b>Ollama</b><span>Gemma / Qwen<br>local · PHI-safe · $0</span></div>
-    <div class="kpi p"><b>Offline</b><span>heuristic rules<br>no network, always works</span></div>
-  </div>
-</section>
+    <section id="milestones">
+      <div class="section-head">
+        <div><div class="eyebrow">Delivered evidence</div><h2>Completed milestones</h2></div>
+        <p>Milestones are tied to repository evidence, not roadmap checkboxes.</p>
+      </div>
+      <div class="milestone-grid"><article class="milestone"><header><span class="badge ok">merged</span><span>PR #12</span></header><h3>Phase 1 safety freeze</h3></article><article class="milestone"><header><span class="badge ok">merged</span><span>PR #13</span></header><h3>Phase 2A transactional audit hardening</h3></article><article class="milestone"><header><span class="badge ok">merged</span><span>PRs #14 and #15</span></header><h3>CodeQL enablement and alert closure</h3></article><article class="milestone"><header><span class="badge ok">merged</span><span>PR #16</span></header><h3>Copilot repository safety context</h3></article><article class="milestone"><header><span class="badge warn">local gates passed; GitHub gates pending</span><span>PR #17</span></header><h3>Release-closeout recovery and V2 isolation</h3></article></div>
+    </section>
 
-<section class="wrap reveal">
-  <h2><b>Agentic reasoning</b> — propose, then the guardrail disposes</h2>
-  <p class="lead">Beyond a linear checklist: Argus reasons over the evidence graph, chains
-    findings into attack paths, and adapts what it runs next — every action still
-    re-authorized by the 7-layer guardrail, so autonomy never escapes scope.</p>
-  <div class="grid">
-    <div class="card"><div class="n">Module 1</div><h3>Web / API recon</h3><p>Curated read-only probe for <code>.env</code>, <code>.git</code>, actuator, Swagger/OpenAPI — maps the unauthenticated foothold surface.</p></div>
-    <div class="card"><div class="n">Module 5</div><h3>Segmentation validator</h3><p>Reframes recon as architecture: flags database/management/directory planes reachable from a user VLAN.</p></div>
-    <div class="card"><div class="n">Module 4</div><h3>Shadow-AI discovery</h3><p>Finds ungoverned local LLMs/notebooks (Ollama, Jupyter, Gradio, vLLM, vector DBs).</p></div>
-    <div class="card"><div class="n">Module 2</div><h3>Credential exposure</h3><p>Detects GPP cpassword, exposed <code>.env</code>/<code>.git</code>, history/registry secrets — <b>reports the path, never the secret</b>.</p></div>
-    <div class="card"><div class="n">Module 3</div><h3>Chaining engine</h3><p>Deterministic decision-trees derive multi-step attack paths, each tagged <code>proof: observed | theoretical</code>.</p></div>
-    <div class="card"><div class="n">Module 3b</div><h3>Planner loop</h3><p>observe → plan → <b>authorize</b> → collect → re-plan, bounded by budget/depth. Guardrail vets every step.</p></div>
-    <div class="card" style="border-left:3px solid var(--red)"><div class="n">PoC verifier</div><h3>Lab-only, 3-gate</h3><p>Armed <b>and</b> in <code>AEGIS_LAB_NET</code> <b>and</b> isolation-attested — connect/read-only probes, never against clinical scope.</p></div>
-  </div>
-</section>
+    <section id="roadmap">
+      <div class="section-head">
+        <div><div class="eyebrow">Evidence gates</div><h2>Phase roadmap</h2></div>
+        <p>NOW closes before NEXT begins. LATER and DEFERRED do not imply current capability.</p>
+      </div>
+      <div class="roadmap-grid"><article class="roadmap-column state-now"><h3>NOW</h3><ul><li>Merge one evidence-complete supervised V1 release-closeout PR</li></ul></article><article class="roadmap-column state-next"><h3>NEXT</h3><ul><li>Complete one bounded operational V2 foundation</li><li>Move HMAC signing out of the orchestrator</li></ul></article><article class="roadmap-column state-later"><h3>LATER</h3><ul><li>Add an independently administered external anchor</li><li>Add browser-executed DOM security coverage</li></ul></article><article class="roadmap-column state-deferred"><h3>DEFERRED</h3><ul><li>Unattended continuous service</li><li>Production, regulated, network-exposed, or multi-user deployment</li></ul></article></div>
+    </section>
 
-<section class="wrap reveal">
-  <h2><b>Security posture</b> — strict by default</h2>
-  <p class="lead">Built for a internal enterprise network: read-only, isolated, least-privilege, auditable.</p>
-  <div class="sec"><span class="chk">✓</span><span><b>Read-only everywhere.</b> No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>Sandbox-first.</b> Targets run on an internet-and-LAN-isolated network; live work requires written authorization + CIDR scope + sensitive/regulated systems exclusions.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>Least privilege &amp; strict transport.</b> Dedicated read-only audit accounts; WinRM defaults to HTTPS with cert validation; SSH key-auth preferred.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>Credentials never logged.</b> The audit records only the check + target; secrets and PHI are redacted from all output.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>Tamper-evident.</b> HMAC-chained audit trail; <code>aegis audit</code> verifies the chain end-to-end.</span></div>
-  <div class="sec"><span class="chk">✓</span><span><b>PHI-safe AI.</b> Local Ollama keeps sensitive data on-host; cloud Claude is reserved for offline report-writing.</span></div>
-</section>
+    <section id="blockers">
+      <div class="section-head">
+        <div><div class="eyebrow">Decision pressure</div><h2>Blocker matrix</h2></div>
+        <p>Release gates and deferred constraints are separated so future scope
+          cannot masquerade as a current blocker.</p>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th>State</th><th>Impact</th><th>Owner</th></tr></thead>
+        <tbody><tr><th>Release verification</th><td><span class="badge warn">local gates passed; GitHub gates pending</span></td><td>merge blocked until GitHub CI, CodeQL, and the one authorized review pass</td><td>sole implementation session</td></tr><tr><th>Out-of-band signer</th><td><span class="badge warn">deferred issue #4</span></td><td>blocks higher-trust deployment, not supervised isolated-lab RC</td><td>future separately authorized increment</td></tr><tr><th>Operational V2 lifecycle</th><td><span class="badge warn">deferred by Path A</span></td><td>continuous mode remains experimental and unsupported</td><td>future separately authorized increment</td></tr></tbody>
+      </table>
+    </section>
 
-<footer class="wrap">
-  Argus · authorized internal security testing only · generated architecture overview
-</footer>
+    <section id="next-action">
+      <div class="section-head">
+        <div><div class="eyebrow">Operator queue</div><h2>Next exact action</h2></div>
+        <p>One executable action owns the NOW gate.</p>
+      </div>
+      <div class="next-action">Publish this verified snapshot, require green GitHub CI and CodeQL on the resulting head, then obtain the single authorized read-only review before merge.</div>
+    </section>
 
-<script>
-  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.12});
-  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-</script>
+    <section id="architecture">
+      <div class="section-head">
+        <div><div class="eyebrow">System boundary</div><h2>Architecture</h2></div>
+        <p>Supported V1 architecture from operator input through transactional audit.</p>
+      </div>
+      <article class="flow-panel"><ol class="flow"><li><span class="step-index">01</span><span>Operator CLI or localhost-only console</span></li><li><span class="step-index">02</span><span>Fail-closed guardrail: scope, tool firewall, arguments, budget, time, audit, output</span></li><li><span class="step-index">03</span><span>Docker sandbox by default; approved local exception only</span></li><li><span class="step-index">04</span><span>Read-only network, host, AD, and web collectors</span></li><li><span class="step-index">05</span><span>Optional AI analysis; never an authorization source</span></li><li><span class="step-index">06</span><span>Deterministic V1 chaining and CSV/Markdown/JSON reports</span></li><li><span class="step-index">07</span><span>Transactional Phase 2A audit log plus local non-WORM consistency anchor</span></li></ol></article>
+    </section>
+
+    <section id="execution-flows">
+      <div class="section-head">
+        <div><div class="eyebrow">Truthful execution</div><h2>V1 execution flow</h2></div>
+        <p>V1 is operator-invoked and bounded. V2 remains incomplete and opt-in experimental.</p>
+      </div>
+      <div class="flow-grid">
+        <article class="flow-panel"><h3>V1 execution flow</h3><ol class="flow"><li><span class="step-index">01</span><span>operator supplies explicit targets and profile</span></li><li><span class="step-index">02</span><span>target scope is normalized and checked</span></li><li><span class="step-index">03</span><span>high-risk mode requires exact approval</span></li><li><span class="step-index">04</span><span>guardrail authorizes the tool and arguments</span></li><li><span class="step-index">05</span><span>sandbox executes a bounded collector</span></li><li><span class="step-index">06</span><span>output is sanitized and normalized</span></li><li><span class="step-index">07</span><span>planner may propose the next bounded profile</span></li><li><span class="step-index">08</span><span>findings and proof-tagged paths are reported</span></li><li><span class="step-index">09</span><span>every decision and execution boundary is audited</span></li></ol></article>
+        <article class="flow-panel"><h3>V2 experimental flow</h3><ol class="flow"><li><span class="step-index">01</span><span>specialized agent proposals</span></li><li><span class="step-index">02</span><span>incomplete target and collector integration</span></li><li><span class="step-index">03</span><span>experimental EvidenceGraph</span></li><li><span class="step-index">04</span><span>non-release-grade global correlation</span></li><li><span class="step-index">05</span><span>non-transactional graph persistence</span></li><li><span class="step-index">06</span><span>gated ContinuousRunner</span></li><li><span class="step-index">07</span><span>no supported CLI or unattended loop</span></li></ol></article>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <div class="section-head">
+        <div><div class="eyebrow">Verification</div><h2>Test and security evidence</h2></div>
+        <p>Local and GitHub gates are visible without converting pending work into a claim.</p>
+      </div>
+      <div class="evidence-grid"><article class="evidence-card"><span>Baseline tests</span><strong>279 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Release tests</span><strong>289 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Ruff</span><strong>passed-approved-baseline-comparison</strong><span class="badge warn">passed-approved-baseline-comparison</span></article><article class="evidence-card"><span>Bandit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Dependency audit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>CodeQL</span><strong>0 open alerts</strong><span class="badge ok">baseline-passed</span></article></div>
+      <div class="boundary" style="margin-top:1rem"><ul><li>289-test hash-locked Python 3.12 release-closeout regression passed</li><li>51 focused release, V2, web, and audit tests passed</li><li>123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed</li><li>Ruff comparison found no new or changed findings; every changed Python file passed</li><li>Bandit found no medium- or high-severity issue</li><li>Dependency audit found no known vulnerability</li><li>Clean sdist, wheel build, locked wheel install, and CLI smoke passed</li><li>Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved</li><li>Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved</li><li>baseline main CI and CodeQL passed</li><li>baseline open CodeQL alerts: 0</li></ul></div>
+    </section>
+
+    <section id="decisions">
+      <div class="section-head">
+        <div><div class="eyebrow">Canonical sources</div><h2>Decisions</h2></div>
+        <p>Release rationale, roadmap gates, operations, rollback, and recovery
+          evidence live in the versioned control pack.</p>
+      </div>
+      <div class="control-links"><a class="control-link" href="control/PROJECT_CONTROL.md">Project control</a><a class="control-link" href="control/ROADMAP.md">Roadmap</a><a class="control-link" href="control/DECISIONS.md">Decisions</a><a class="control-link" href="control/RUNBOOK.md">Runbook</a><a class="control-link" href="control/CHANGELOG.md">Change log</a><a class="control-link" href="control/AGENT_HANDOFF.md">Agent handoff</a><a class="control-link" href="control/STATUS.json">Machine status</a></div>
+    </section>
+
+    <section id="operations">
+      <div class="section-head">
+        <div><div class="eyebrow">Safe use</div><h2>Operations and rollback</h2></div>
+        <p>Use the runbook for release verification, audit recovery, Phase 1/V2
+          incompatibility, and rollback. No deployment was performed.</p>
+      </div>
+      <div class="next-action">
+        <a href="control/RUNBOOK.md">Open the release and operations runbook</a>
+        · <a href="control/AGENT_HANDOFF.md">Review preserved worktree evidence</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div><strong>Source commit:</strong> <code>f16f61a6bbef5aaf322cbdaaf6039199a078cd99</code></div>
+    <div><strong>Last updated:</strong> <time datetime="2026-07-30T07:19:02Z">2026-07-30T07:19:02Z</time></div>
+    <div>Argus · authorized defensive assessment only · no deployment performed</div>
+  </footer>
 </body>
 </html>
