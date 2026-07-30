@@ -72,3 +72,16 @@
 - **Consequences:** release documentation states “not deployed”; a future
   operator deployment requires the runbook and independent authorization.
 
+## ADR-007 — Close `NOW` at the reviewed merge
+
+- **Status:** accepted and delivered
+- **Decision:** PR #17 at head
+  `8f1fed7d88c821f926c332ea691f151c58d73dbd` is the complete implementation
+  boundary and was merged as
+  `b75af239c441204699114ce34970e37b394b3c21`.
+- **Evidence:** 292 hash-locked tests, unchanged Ruff finding set with no new
+  finding, clean changed-file Ruff, zero medium/high Bandit issue, successful
+  dependency audit, clean package/wheel smoke, one resolved read-only review,
+  green PR and post-merge CI/CodeQL, and zero open CodeQL alerts.
+- **Consequences:** `NOW` is closed. No V2 operationalization, signer work,
+  deployment, or later roadmap item is implicitly authorized.

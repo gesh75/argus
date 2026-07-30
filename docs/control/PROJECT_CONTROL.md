@@ -6,14 +6,15 @@
 |---|---|
 | Repository | `gesh75/argus` |
 | Canonical local path | `/Users/georgigaydarov/Projects/ecp-aegis-lab` |
-| Remote main | `79cb27269333a34ae6dac42897f9b15e99e4f667` |
-| Active branch | `fix/argus-release-closeout` |
+| Release merge on remote `main` | `b75af239c441204699114ce34970e37b394b3c21` |
+| Delivered branch | `fix/argus-release-closeout` at `8f1fed7d88c821f926c332ea691f151c58d73dbd` |
+| Pull request | [#17](https://github.com/gesh75/argus/pull/17), merged |
 | Branch source snapshot | Recorded in [`STATUS.json`](STATUS.json) |
 | Worktree | One canonical writer; competing work preserved per [`AGENT_HANDOFF.md`](AGENT_HANDOFF.md) |
 | Lifecycle | Release closeout |
 | Maturity | Release candidate for supervised defensive assessment; alpha runtime maturity |
 | Release target | Argus 1.0 supervised defensive assessment release candidate |
-| Active phase | `NOW` — Path A closeout |
+| Active phase | `NOW` complete — Path A closeout delivered |
 | Last verified | Recorded in [`STATUS.json`](STATUS.json) |
 
 ## Supported boundary
@@ -96,13 +97,16 @@ gate for a future V2 foundation.
 - Release-closeout worktree reconciliation and evidence preservation.
 - Explicit experimental gate and warnings for V2 continuous mode.
 - Canonical control pack and deterministic dashboard.
+- PR #17 merged with head-SHA protection as
+  `b75af239c441204699114ce34970e37b394b3c21`; its one independent read-only
+  review was resolved and post-merge CI/CodeQL passed.
 
 ## Priority gaps
 
 ### P0
 
-No unresolved P0 blocker is accepted for the supervised V1 release candidate.
-Every required release gate must pass before merge.
+No unresolved P0 blocker exists for the supervised V1 release candidate.
+Every required release and post-merge gate passed.
 
 ### P1
 
@@ -122,17 +126,23 @@ Every required release gate must pass before merge.
 
 ## Repository and security state
 
-- Open pull requests at baseline: none.
+- Release pull request: PR #17, merged.
 - Open issues at baseline: issue #4 only.
-- Open CodeQL alerts at baseline: none.
+- Open CodeQL alerts after merge: none.
 - Baseline main CI, CodeQL, Copilot setup, and Pages runs passed at
   `79cb27269333a34ae6dac42897f9b15e99e4f667`.
 - Local Python 3.12 hash-locked baseline: 279 collected, 279 passed.
 - Final release-closeout evidence is recorded in [`STATUS.json`](STATUS.json)
   and [`CHANGELOG.md`](CHANGELOG.md).
+- Post-merge CI:
+  [run 30523751828](https://github.com/gesh75/argus/actions/runs/30523751828),
+  passed.
+- Post-merge CodeQL:
+  [run 30523751784](https://github.com/gesh75/argus/actions/runs/30523751784),
+  passed.
 
 ## Next exact action
 
-Execute the binary `NOW` gate in [`ROADMAP.md`](ROADMAP.md), publish the single
-release-closeout pull request, require green CI/CodeQL plus one read-only
-review, merge with head-SHA protection, and verify post-merge main.
+No additional repository action is authorized. `NOW` is complete. Begin a
+`NEXT` item only from current `main`, on a fresh branch, after separate
+authorization.

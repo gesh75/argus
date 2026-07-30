@@ -27,7 +27,12 @@ gate and evidence are satisfied.
 - **Evidence:** pull request, CI/CodeQL URLs, final `STATUS.json`, generated
   dashboard, and merge SHA.
 - **Owner:** Georgi Gaydarov; implementation executed by the sole Codex session.
-- **Current state:** in progress until the merge and post-merge gates complete.
+- **Current state:** complete. PR #17 merged as
+  `b75af239c441204699114ce34970e37b394b3c21`; post-merge
+  [CI 30523751828](https://github.com/gesh75/argus/actions/runs/30523751828)
+  and
+  [CodeQL 30523751784](https://github.com/gesh75/argus/actions/runs/30523751784)
+  passed with zero open CodeQL alerts.
 - **Re-entry condition:** any regression or contradicted release claim reopens
   `NOW`; no later phase starts first.
 
@@ -160,4 +165,3 @@ gate and evidence are satisfied.
 - **Current state:** deferred.
 - **Re-entry condition:** explicit owner authorization after technical and
   operational prerequisites are complete.
-

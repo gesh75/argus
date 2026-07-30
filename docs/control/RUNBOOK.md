@@ -121,3 +121,19 @@ must independently verify Docker network isolation, written authorization,
 exact CIDR scope, exclusions, non-production credentials, audit parent
 ownership/modes, and server bind address before execution.
 
+## Delivered closeout baseline
+
+- PR: [#17](https://github.com/gesh75/argus/pull/17)
+- Reviewed branch head:
+  `8f1fed7d88c821f926c332ea691f151c58d73dbd`
+- Merge commit:
+  `b75af239c441204699114ce34970e37b394b3c21`
+- Post-merge CI:
+  [30523751828](https://github.com/gesh75/argus/actions/runs/30523751828)
+- Post-merge CodeQL:
+  [30523751784](https://github.com/gesh75/argus/actions/runs/30523751784)
+- Deployment: no Argus runtime, live target, or unattended service deployed.
+
+Preserve the feature branch temporarily for forensic comparison. Any future
+increment starts from current `main` on a fresh branch and reruns this entire
+gate.
