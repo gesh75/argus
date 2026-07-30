@@ -9,7 +9,7 @@
 
 > **Run supervised defensive assessments inside an explicitly authorized, separately verified lab.** Argus turns bounded read-only collection into proof-annotated findings behind a fail-closed guardrail.
 
-![tests](https://img.shields.io/badge/tests-289%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
@@ -156,7 +156,7 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Tests
 
-Current release-closeout collection: **289 tests** on Python 3.12. Historical counts in the build log and phase delivery reports remain labeled snapshots.
+Current release-closeout collection: **292 tests** on Python 3.12. Historical counts in the build log and phase delivery reports remain labeled snapshots.
 
 ```bash
 cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
