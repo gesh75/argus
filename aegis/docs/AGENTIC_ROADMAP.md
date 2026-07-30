@@ -1,13 +1,13 @@
-# Argus — Agentic Evolution Roadmap
+# Argus — Supported V1 Planner and Historical Agentic Roadmap
 
-Turns Aegis from an automated scanner framework into an **agentic AI pentester** that
-reasons, chains, and adapts — without breaking the read-only / fail-closed contract that
-makes it safe in a HIPAA/clinical network.
+This document describes the bounded, operator-invoked V1 planner. It does not describe V2
+specialized agents or an unattended service. The active roadmap and V2 re-entry gate are in
+[`../../docs/control/ROADMAP.md`](../../docs/control/ROADMAP.md).
 
 ## Design principle
 > The agent **proposes**, the guardrail **disposes**. Every action an LLM (or chaining
-> engine) wants still flows through the existing 7-layer fail-closed guardrail. Autonomy is
-> bounded by scope + tool firewall + budget + audit. New offensive capability is read-only
+> engine) wants still flows through the existing 7-layer fail-closed guardrail. The V1 planner
+> is bounded by scope + tool firewall + budget + audit. New offensive capability is read-only
 > *inference over observed evidence*; the only code that emits packets beyond read-only recon
 > is the PoC runner, hard-gated to the `--arm` flag **and** the isolated lab network.
 
@@ -20,7 +20,7 @@ makes it safe in a HIPAA/clinical network.
 | 5 | Segmentation validator | `recon/segmentation.py` | read-only reachability inference | ✅ |
 | 2 | Credential **exposure** | `recon/cred_exposure.py` | read-only (detect, never collect) | ✅ |
 | 3 | Chaining / reasoning engine | `agent/chains.py` | read-only inference | ✅ |
-| 3b | Agentic planner loop | `agent/planner.py` | read-only, per-step guardrail auth | ✅ |
+| 3b | Bounded V1 planner loop | `agent/planner.py` | operator-invoked, read-only, per-step guardrail auth | operational and tested |
 | PoC | Lab-only PoC verifier | `agent/poc_runner.py` | armed + lab-net ONLY | ✅ |
 
 ## Posture decisions (locked)
@@ -36,5 +36,5 @@ Collectors emit `Observation`s into a shared evidence set. The chaining engine
 (`agent/chains.py`) runs deterministic decision-trees over that set to derive multi-step
 attack paths, each annotated `proof: observed | theoretical`. The planner loop
 (`agent/planner.py`) uses the same evidence to choose the next read-only collector to run,
-re-planning until budget/depth/no-new-info — every chosen action re-authorized by the
-guardrail.
+re-planning until budget/depth/no-new-info. Every chosen action is re-authorized by the
+guardrail. No supported scheduler or unattended loop invokes it.

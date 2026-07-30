@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-30T07:33:53Z",
+  "repository": "gesh75/argus",
+  "current_main_sha": "79cb27269333a34ae6dac42897f9b15e99e4f667",
+  "active_branch": "fix/argus-release-closeout",
+  "head_sha": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
+  "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
+  "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
+  "dirty": false,
+  "release_target": "Argus 1.0 supervised defensive assessment release candidate",
+  "maturity": "release candidate; supervised alpha runtime",
+  "supported_deployment_modes": [
+    "supervised, explicitly authorized isolated-lab assessment",
+    "Python 3.12+ POSIX macOS/Linux controller",
+    "V1 CLI with Docker sandbox by default",
+    "localhost-only FastAPI console with server-owned live mode",
+    "Phase 2A transactional audit diagnostics and local consistency anchor"
+  ],
+  "unsupported_deployment_modes": [
+    "unattended, scheduled, or 24/7 operation",
+    "V2 continuous mode as a supported product",
+    "production or regulated deployment",
+    "network-exposed or multi-user service",
+    "local JSON anchor represented as WORM",
+    "Windows-hosted audit writing"
+  ],
+  "test_results": {
+    "baseline_collect": {
+      "status": "passed",
+      "count": 279,
+      "python": "3.12.13",
+      "dependency_source": "aegis/requirements.lock --require-hashes"
+    },
+    "baseline_full": {
+      "status": "passed",
+      "passed": 279
+    },
+    "release_boundary_focused": {
+      "status": "passed",
+      "passed": 51
+    },
+    "release_closeout_full": {
+      "status": "passed",
+      "passed": 292
+    }
+  },
+  "lint_results": {
+    "status": "passed-approved-baseline-comparison",
+    "full_exit_code": 1,
+    "baseline_findings": 25,
+    "branch_findings": 20,
+    "new_findings": 0,
+    "changed_findings": 0,
+    "removed_findings": 5,
+    "baseline_comparison": "passed",
+    "changed_python_files": "passed",
+    "suppressions_added": false
+  },
+  "bandit": {
+    "status": "passed",
+    "severity": "medium",
+    "confidence": "medium",
+    "medium_or_high_findings": 0
+  },
+  "dependency_audit": {
+    "status": "passed",
+    "command": "pip-audit -r requirements.lock --strict --desc",
+    "known_vulnerabilities": 0,
+    "note": "The uv-created local Python 3.12 audit environment failed inside ensurepip before auditing; pinned pip-audit 2.10 completed successfully in the functional local tool environment. GitHub Python 3.12 remains authoritative."
+  },
+  "package_build": {
+    "status": "passed",
+    "artifacts": [
+      "sdist",
+      "wheel"
+    ],
+    "source": "clean git archive"
+  },
+  "wheel_smoke": {
+    "status": "passed",
+    "python": "3.12.13",
+    "dependency_source": "aegis/requirements.lock --require-hashes",
+    "commands": [
+      "argus --help",
+      "argus audit --help"
+    ]
+  },
+  "codeql": {
+    "status": "baseline-passed",
+    "open_alerts": 0,
+    "baseline_run": "https://github.com/gesh75/argus/actions/runs/30385808459",
+    "release_closeout_run": null
+  },
+  "open_pull_requests": [
+    {
+      "number": 17,
+      "title": "fix: close Argus supervised release boundary",
+      "url": "https://github.com/gesh75/argus/pull/17",
+      "draft": true
+    }
+  ],
+  "open_issues": [
+    {
+      "number": 4,
+      "title": "Move the HMAC audit signing key out-of-band from the tool runner",
+      "url": "https://github.com/gesh75/argus/issues/4",
+      "release_blocker": false
+    }
+  ],
+  "blockers": [],
+  "next_action": "Publish this verified snapshot, require green GitHub CI and CodeQL on the resulting head, then obtain the single authorized read-only review before merge.",
+  "documentation_freshness": {
+    "status": "verified source snapshot",
+    "generator": "scripts/generate_control_dashboard.py",
+    "dashboard": "docs/index.html",
+    "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2"
+  },
+  "completed_milestones": [
+    {
+      "name": "Phase 1 safety freeze",
+      "evidence": "PR #12",
+      "state": "merged"
+    },
+    {
+      "name": "Phase 2A transactional audit hardening",
+      "evidence": "PR #13",
+      "state": "merged"
+    },
+    {
+      "name": "CodeQL enablement and alert closure",
+      "evidence": "PRs #14 and #15",
+      "state": "merged"
+    },
+    {
+      "name": "Copilot repository safety context",
+      "evidence": "PR #16",
+      "state": "merged"
+    },
+    {
+      "name": "Release-closeout recovery and V2 isolation",
+      "evidence": "PR #17",
+      "state": "local gates passed; GitHub gates pending"
+    }
+  ],
+  "roadmap": {
+    "NOW": [
+      "Merge one evidence-complete supervised V1 release-closeout PR"
+    ],
+    "NEXT": [
+      "Complete one bounded operational V2 foundation",
+      "Move HMAC signing out of the orchestrator"
+    ],
+    "LATER": [
+      "Add an independently administered external anchor",
+      "Add browser-executed DOM security coverage"
+    ],
+    "DEFERRED": [
+      "Unattended continuous service",
+      "Production, regulated, network-exposed, or multi-user deployment"
+    ]
+  },
+  "blocker_matrix": [
+    {
+      "item": "Release verification",
+      "state": "local gates passed; GitHub gates pending",
+      "impact": "merge blocked until GitHub CI, CodeQL, and the one authorized review pass",
+      "owner": "sole implementation session"
+    },
+    {
+      "item": "Out-of-band signer",
+      "state": "deferred issue #4",
+      "impact": "blocks higher-trust deployment, not supervised isolated-lab RC",
+      "owner": "future separately authorized increment"
+    },
+    {
+      "item": "Operational V2 lifecycle",
+      "state": "deferred by Path A",
+      "impact": "continuous mode remains experimental and unsupported",
+      "owner": "future separately authorized increment"
+    }
+  ],
+  "architecture": [
+    "Operator CLI or localhost-only console",
+    "Fail-closed guardrail: scope, tool firewall, arguments, budget, time, audit, output",
+    "Docker sandbox by default; approved local exception only",
+    "Read-only network, host, AD, and web collectors",
+    "Optional AI analysis; never an authorization source",
+    "Deterministic V1 chaining and CSV/Markdown/JSON reports",
+    "Transactional Phase 2A audit log plus local non-WORM consistency anchor"
+  ],
+  "v1_execution_flow": [
+    "operator supplies explicit targets and profile",
+    "target scope is normalized and checked",
+    "high-risk mode requires exact approval",
+    "guardrail authorizes the tool and arguments",
+    "sandbox executes a bounded collector",
+    "output is sanitized and normalized",
+    "planner may propose the next bounded profile",
+    "findings and proof-tagged paths are reported",
+    "every decision and execution boundary is audited"
+  ],
+  "v2_experimental_flow": [
+    "specialized agent proposals",
+    "incomplete target and collector integration",
+    "experimental EvidenceGraph",
+    "non-release-grade global correlation",
+    "non-transactional graph persistence",
+    "gated ContinuousRunner",
+    "no supported CLI or unattended loop"
+  ],
+  "security_evidence": [
+    "292-test hash-locked Python 3.12 release-closeout regression passed",
+    "51 focused release, V2, web, and audit tests passed",
+    "123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed",
+    "Ruff comparison found no new or changed findings; every changed Python file passed",
+    "Bandit found no medium- or high-severity issue",
+    "Dependency audit found no known vulnerability",
+    "Clean sdist, wheel build, locked wheel install, and CLI smoke passed",
+    "Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved",
+    "Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved",
+    "baseline main CI and CodeQL passed",
+    "baseline open CodeQL alerts: 0"
+  ],
+  "control_links": [
+    {
+      "label": "Project control",
+      "href": "control/PROJECT_CONTROL.md"
+    },
+    {
+      "label": "Roadmap",
+      "href": "control/ROADMAP.md"
+    },
+    {
+      "label": "Decisions",
+      "href": "control/DECISIONS.md"
+    },
+    {
+      "label": "Runbook",
+      "href": "control/RUNBOOK.md"
+    },
+    {
+      "label": "Change log",
+      "href": "control/CHANGELOG.md"
+    },
+    {
+      "label": "Agent handoff",
+      "href": "control/AGENT_HANDOFF.md"
+    },
+    {
+      "label": "Machine status",
+      "href": "control/STATUS.json"
+    }
+  ]
+}

@@ -41,8 +41,9 @@ pip-audit -r requirements.lock --strict --desc
 python -m build
 ```
 
-The Phase 1 branch collects **139 tests**. Exact final pass counts and the immutable tested SHA
-are recorded in the draft pull request and delivery report.
+The Phase 1 branch collected **139 tests** at its delivery snapshot. Current counts and the
+immutable release-closeout source SHA are recorded in `docs/control/STATUS.json`; historical
+counts are not current verification.
 
 ## Historical versus current results
 
@@ -56,6 +57,7 @@ are recorded in the draft pull request and delivery report.
 
 ## Deferred work
 
-Phase 2 is not implemented here. Structured secret/PHI controls, transactional audit storage,
+Phase 2A transactional audit storage was implemented later in PR #13. Operational V2,
 lab-isolation proof, authenticated multi-user service design, durable continuous operation, and
-evidence-model redesign remain deferred.
+evidence-model redesign remain deferred. See `aegis/docs/PHASE2A_AUDIT_OPERATIONS.md` and
+`docs/control/PROJECT_CONTROL.md`.

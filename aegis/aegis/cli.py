@@ -298,7 +298,14 @@ def cmd_verify(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="aegis", description="Argus pentest orchestrator")
+    p = argparse.ArgumentParser(
+        prog="aegis",
+        description="Argus supervised defensive-assessment orchestrator",
+        epilog=(
+            "V2 continuous mode is experimental and unsupported; "
+            "no continuous command is provided."
+        ),
+    )
     p.add_argument("--policy", default=str(DEFAULT_POLICY))
     sub = p.add_subparsers(dest="cmd", required=True)
 

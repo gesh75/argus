@@ -46,4 +46,5 @@ def test_phase1_documentation_states_the_enforced_boundaries() -> None:
     assert "all redirects" in text and "refused" in text
     assert "localhost-only" in text
     assert "live" in text and "disabled by default" in text
-    assert "phase 2" in text and "not implemented" in text
+    assert "phase 2a" in text and "implemented" in text
+    assert "operational v2" in text and "deferred" in text

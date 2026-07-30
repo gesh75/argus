@@ -1,31 +1,54 @@
-# Phased Implementation Plan — Argus Defender Fabric V2
+# Argus V2 Implementation Re-entry Plan
 
-> **Status: roadmap.** Checked items may be scaffolding or documentation only. The continuous
-> V2 service is not production-ready and is not approved for unattended or 24/7 operation.
+> **Status: not started.** Do not continue the historical
+> `feature/argus-defender-fabric-v2` branch. Begin only from merged release
+> closeout `main` after separate authorization.
 
-## Phase 0 — Foundation (this branch)
-- [x] Create branch `feature/argus-defender-fabric-v2`
-- [x] EvidenceGraph core scaffold
-- [x] Multi-agent skeleton under existing Guardrail
-- [ ] Continuous mode design + CLI entrypoint
-- [ ] Updated architecture docs + animated page
-- [ ] Branding cleanup notes
+## Gate 0 — Approved design
 
-## Phase 1 — Intelligence
-- Expand deterministic chains into graph-based reasoning
-- LLM hypothesis generation (structured output) still forced through Guardrail
-- Specialized agents (Recon / Host / AD / Web / Correlation)
+- Map every proposal to explicit targets and an existing collector.
+- Define typed proposals, results, observations, denials, and errors.
+- Define deterministic asset/path identity and correlation rules.
+- Define transactional persistence schema and recovery.
+- Define bounded CLI and opt-in loop behavior.
+- Prove no guardrail, sandbox, approval, audit, or web boundary changes.
 
-## Phase 2 — UI
-- React + Tailwind + Cytoscape.js attack-path graph
-- Live WebSocket evidence stream
-- Session history + multi-operator support
+Exit: approved design with file inventory, threat model, failure matrix, test
+map, operations, and rollback.
 
-## Phase 3 — Production Hardening
-- Out-of-band HMAC signer process
-- Real WORM anchor (S3 Object Lock / KMS)
-- Continuous scheduler + delta reporting
-- SARIF + compliance mappings
+## Gate 1 — End-to-end dry-run foundation
 
-## Phase 4 — Fabric Integration
-- Native hooks for netlog-ai, multivendor lab, Aegis validator
+Implement test-first:
+
+```text
+proposal
+→ authorization
+→ collector
+→ observation
+→ graph
+→ asset-bound correlation
+→ deterministic persistence
+→ delta
+```
+
+Exit: save→reload→rerun→delta tests pass; repeated cycles are idempotent; all
+denials/errors are structured; no blanket exception suppression exists.
+
+## Gate 2 — Bounded command
+
+Add one dry-run-first command with explicit targets. Do not add a default
+continuous loop.
+
+Exit: help and offline smoke tests pass, unsupported modes remain absent, and
+full Python 3.12/security/package/CI/CodeQL gates pass.
+
+## Deferred gates
+
+- separately authenticated out-of-band signer;
+- independently administered external anchor;
+- browser evidence UI;
+- scheduler, alerting, soak testing, and operations;
+- multi-user or higher-trust deployment.
+
+See [`control/ROADMAP.md`](control/ROADMAP.md) for the authoritative roadmap and
+binary exit criteria.
