@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T07:22:05Z",
+  "generated_at": "2026-07-30T07:24:24Z",
   "repository": "gesh75/argus",
   "current_main_sha": "79cb27269333a34ae6dac42897f9b15e99e4f667",
   "active_branch": "fix/argus-release-closeout",
-  "head_sha": "58372036354c4a6872e95bd7bd285b0def19a551",
-  "source_commit": "58372036354c4a6872e95bd7bd285b0def19a551",
+  "head_sha": "eb7897332d91020a4c89e77705049e3da2ad9599",
+  "source_commit": "eb7897332d91020a4c89e77705049e3da2ad9599",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "release candidate; supervised alpha runtime",
@@ -113,7 +113,7 @@
     "status": "verified source snapshot",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "58372036354c4a6872e95bd7bd285b0def19a551"
+    "source_commit": "eb7897332d91020a4c89e77705049e3da2ad9599"
   },
   "completed_milestones": [
     {
