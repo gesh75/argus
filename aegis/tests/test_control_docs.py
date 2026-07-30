@@ -150,6 +150,36 @@ def test_readme_links_to_control_pack_and_dashboard() -> None:
 def test_generated_documentation_matches_its_source_commit() -> None:
     status = json.loads(STATUS.read_text())
     source_commit = status["source_commit"]
+    source_is_available = (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{source_commit}^{{commit}}"],
+            cwd=REPO_ROOT,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+    if not source_is_available:
+        shallow = subprocess.check_output(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=REPO_ROOT,
+            text=True,
+        ).strip()
+        raw_head = subprocess.check_output(
+            ["git", "cat-file", "commit", "HEAD"],
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        assert shallow == "true"
+        assert f"parent {source_commit}\n" in raw_head
+        expected = _generate(DASHBOARD.parent / ".index.generated-test.html")
+        try:
+            assert expected == DASHBOARD.read_bytes()
+        finally:
+            (DASHBOARD.parent / ".index.generated-test.html").unlink()
+        return
+
     distance = int(
         subprocess.check_output(
             ["git", "rev-list", "--count", f"{source_commit}..HEAD"],
