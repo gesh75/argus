@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T07:33:53Z",
+  "generated_at": "2026-07-30T07:43:53Z",
   "repository": "gesh75/argus",
-  "current_main_sha": "79cb27269333a34ae6dac42897f9b15e99e4f667",
-  "active_branch": "fix/argus-release-closeout",
-  "head_sha": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
+  "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
+  "current_main_sha": "6f4d8326e8b99dd56f04df23079657d30798ae84",
+  "active_branch": "main",
+  "head_sha": "6f4d8326e8b99dd56f04df23079657d30798ae84",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2",
+  "source_commit": "6f4d8326e8b99dd56f04df23079657d30798ae84",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
-  "maturity": "release candidate; supervised alpha runtime",
+  "maturity": "NOW complete; supervised defensive assessment release candidate; alpha runtime",
   "supported_deployment_modes": [
     "supervised, explicitly authorized isolated-lab assessment",
     "Python 3.12+ POSIX macOS/Linux controller",
@@ -87,19 +88,20 @@
     ]
   },
   "codeql": {
-    "status": "baseline-passed",
+    "status": "passed",
     "open_alerts": 0,
     "baseline_run": "https://github.com/gesh75/argus/actions/runs/30385808459",
-    "release_closeout_run": null
+    "release_closeout_run": "https://github.com/gesh75/argus/actions/runs/30523639583",
+    "post_merge_run": "https://github.com/gesh75/argus/actions/runs/30523751784"
   },
-  "open_pull_requests": [
-    {
-      "number": 17,
-      "title": "fix: close Argus supervised release boundary",
-      "url": "https://github.com/gesh75/argus/pull/17",
-      "draft": true
-    }
-  ],
+  "open_pull_requests": [],
+  "merged_pull_request": {
+    "number": 17,
+    "title": "fix: close Argus supervised release boundary",
+    "url": "https://github.com/gesh75/argus/pull/17",
+    "head_sha": "8f1fed7d88c821f926c332ea691f151c58d73dbd",
+    "merge_sha": "b75af239c441204699114ce34970e37b394b3c21"
+  },
   "open_issues": [
     {
       "number": 4,
@@ -109,12 +111,12 @@
     }
   ],
   "blockers": [],
-  "next_action": "Publish this verified snapshot, require green GitHub CI and CodeQL on the resulting head, then obtain the single authorized read-only review before merge.",
+  "next_action": "NONE — NOW increment complete. Start no NEXT item without separate authorization and a fresh branch from current main.",
   "documentation_freshness": {
-    "status": "verified source snapshot",
+    "status": "final post-merge source snapshot",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "65a8ae0ae108f87d43e14eadba24da43cccce5b2"
+    "source_commit": "6f4d8326e8b99dd56f04df23079657d30798ae84"
   },
   "completed_milestones": [
     {
@@ -139,13 +141,13 @@
     },
     {
       "name": "Release-closeout recovery and V2 isolation",
-      "evidence": "PR #17",
-      "state": "local gates passed; GitHub gates pending"
+      "evidence": "PR #17; merge b75af239c441204699114ce34970e37b394b3c21",
+      "state": "merged; post-merge CI and CodeQL passed"
     }
   ],
   "roadmap": {
     "NOW": [
-      "Merge one evidence-complete supervised V1 release-closeout PR"
+      "COMPLETE — supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21"
     ],
     "NEXT": [
       "Complete one bounded operational V2 foundation",
@@ -163,9 +165,9 @@
   "blocker_matrix": [
     {
       "item": "Release verification",
-      "state": "local gates passed; GitHub gates pending",
-      "impact": "merge blocked until GitHub CI, CodeQL, and the one authorized review pass",
-      "owner": "sole implementation session"
+      "state": "closed",
+      "impact": "none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed",
+      "owner": "completed by sole implementation session"
     },
     {
       "item": "Out-of-band signer",
@@ -219,8 +221,10 @@
     "Clean sdist, wheel build, locked wheel install, and CLI smoke passed",
     "Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved",
     "Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved",
-    "baseline main CI and CodeQL passed",
-    "baseline open CodeQL alerts: 0"
+    "PR CI and CodeQL passed on reviewed head 8f1fed7d88c821f926c332ea691f151c58d73dbd",
+    "post-merge main CI 30523751828 and CodeQL 30523751784 passed",
+    "post-merge open CodeQL alerts: 0",
+    "exactly one independent read-only review completed; all three findings were resolved before merge"
   ],
   "control_links": [
     {
