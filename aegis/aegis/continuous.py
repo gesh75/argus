@@ -4,16 +4,16 @@ Runs the specialized agents on a schedule and produces delta reports
 while every single tool call remains under the 7-layer Guardrail.
 """
 from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
+from .agents.base import BaseAgent
 from .evidence import EvidenceGraph
 from .guardrail import Guardrail
-from .agents.base import BaseAgent
-from .persistence import save_graph, load_graph
+from .persistence import load_graph, save_graph
 
 
 @dataclass
@@ -58,10 +58,7 @@ class ContinuousRunner:
                 args = prop.get("args", [])
                 targets = prop.get("targets", [])
                 if tool and targets:
-                    try:
-                        agent.run_authorized(tool, args, targets)
-                    except Exception:
-                        pass  # Guardrail already logged the denial
+                    agent.run_authorized(tool, args, targets)
         # Run correlation if present
         for agent in self.agents:
             if hasattr(agent, "derive_paths"):
@@ -69,8 +66,8 @@ class ContinuousRunner:
         after = set(self.graph.g.nodes)
         new = after - before
         report = DeltaReport(
-            run_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
-            timestamp=datetime.now(timezone.utc),
+            run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+            timestamp=datetime.now(UTC),
             new_observations=[n for n in new if not str(n).startswith("path-")],
             new_paths=[n for n in new if str(n).startswith("path-")],
             summary=f"{len(new)} new nodes this cycle",
