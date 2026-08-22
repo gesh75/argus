@@ -297,6 +297,23 @@ def cmd_verify(args) -> int:
     return 0
 
 
+def cmd_signer(args) -> int:
+    """Hold the HMAC key in a dedicated process (issue #4)."""
+    from .signer import serve_forever
+
+    policy = Policy.load(args.policy)
+    key = os.environ.get(policy.audit_key_env)
+    if not key:
+        print(f"REFUSED: audit key env {policy.audit_key_env} unset", file=sys.stderr)
+        return 2
+    if len(key) < 32:
+        print("REFUSED: audit key too short", file=sys.stderr)
+        return 2
+    print(f"argus signer listening on {args.socket}", file=sys.stderr)
+    serve_forever(args.socket, key.encode())
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="aegis",
@@ -412,6 +429,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     v = sub.add_parser("verify", help="print loaded policy")
     v.set_defaults(func=cmd_verify)
+
+    sg = sub.add_parser(
+        "signer",
+        help="run the out-of-band HMAC signer so the orchestrator never holds the key (#4)",
+    )
+    sg.add_argument(
+        "--socket",
+        default=os.environ.get("ARGUS_SIGNER_SOCKET", "/tmp/argus-signer.sock"),
+        help="unix domain socket path (also ARGUS_SIGNER_SOCKET)",
+    )
+    sg.set_defaults(func=cmd_signer)
     return p
 
 
