@@ -1,4 +1,6 @@
 """AD / Identity Agent — LDAP and identity path proposals (read-only).
+
+Idempotent: stops once ad-kind evidence exists for the operator target.
 """
 from __future__ import annotations
 
@@ -11,19 +13,16 @@ class ADAgent(BaseAgent):
     name = "ad"
 
     def propose(self) -> list[dict[str, Any]]:
-        targets = list(self.default_targets)
+        targets = [t for t in self.default_targets if "ad" not in self.kinds_for(t)]
         if not targets:
             return []
-        blob = " ".join(
-            f"{d.get('kind', '')} {d.get('summary', '')}"
-            for _, d in self.graph.g.nodes(data=True)
-        ).lower()
-        if any(s in blob for s in ("389/tcp", "636/tcp", "445/tcp", "ldap", "smb", "ad")):
-            t = targets[0]
-            return [{
-                "tool": "ldapsearch",
-                "args": ["-x", "-H", f"ldap://{t}", "-s", "base", "namingContexts"],
-                "targets": [t],
-                "reason": "directory/SMB surface observed",
-            }]
-        return []
+        blob = self.blob()
+        if not any(s in blob for s in ("389/tcp", "636/tcp", "445/tcp", "ldap", "smb", "ad")):
+            return []
+        t = targets[0]
+        return [{
+            "tool": "ldapsearch",
+            "args": ["-x", "-H", f"ldap://{t}", "-s", "base", "namingContexts"],
+            "targets": [t],
+            "reason": "directory/SMB surface observed",
+        }]

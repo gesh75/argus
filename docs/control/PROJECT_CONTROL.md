@@ -73,15 +73,15 @@ gate for a future V2 foundation.
 | Report generation | Operational and tested through orchestrators | `reporting.py`; integration regressions | CSV, Markdown, and JSON output |
 | Transactional audit replay and V2 append | Operational and tested | Phase 2A storage, anchor, CLI, filesystem, and multiprocessing tests | Supported on the documented POSIX controller boundary |
 | Local JSON anchor | Operational consistency checkpoint | `anchor.py`; anchor tests | Not WORM and not an independent trust domain |
-| Out-of-band HMAC signer | Explicitly deferred | GitHub issue #4 | Orchestrator still holds the signing key |
-| V2 `BaseAgent.run_authorized()` lifecycle | Scaffold only | It authorizes but does not execute a collector or record observations | Unsupported |
-| V2 `ReconAgent` | Scaffold only | Initial proposal has an empty target list | Unsupported |
-| V2 host, AD, and web specialized agents | Scaffold only | `propose()` returns no proposals | Unsupported |
+| Out-of-band HMAC signer | Operational with in-process fallback | `signer.py`; `UnixSocketSigner`; `argus signer --socket`; issue #4 | Supported when `ARGUS_SIGNER_SOCKET` is set; in-process remains the isolated-lab default |
+| V2 `BaseAgent.run_authorized()` lifecycle | Operational inside the experimental gate | Authorizes, then collects, then records Observations | Experimental; not a supported CLI product |
+| V2 `ReconAgent` | Operational inside the experimental gate | Proposes `nmap` with operator-supplied targets; idempotent after network evidence | Experimental |
+| V2 host, AD, and web specialized agents | Operational inside the experimental gate | `propose()` fills targets from evidence and stops once that kind exists | Experimental |
 | V2 `ContinuousRunner` | Implemented but not integrated, now explicitly gated | Skips targetless proposals, propagates collector failures, and has no supported CLI entry | Experimental and unsupported |
-| V2 EvidenceGraph | Implemented but not release-grade | In-memory NetworkX graph with random path identifiers | Experimental |
-| V2 correlation | Implemented but incorrect for operational use | Combines global categories rather than asset-bound relationships | Experimental |
-| V2 graph persistence | Scaffold only | Direct JSON overwrite; no schema, lock, checksum, atomic durability, or recovery contract | Experimental |
-| V2 delta/closed-path lifecycle | Scaffold only | Set subtraction exists; no demonstrated operational closure lifecycle | Experimental |
+| V2 EvidenceGraph | Implemented but not release-grade | In-memory NetworkX graph with deterministic path identifiers | Experimental |
+| V2 correlation | Asset-bound under the experimental gate | Nodes must share a target before a path is emitted | Experimental |
+| V2 graph persistence | Atomic, schema-versioned, checksummed JSON | Temp file + `os.replace`; checksum mismatch loads empty | Experimental; not WORM |
+| V2 delta/closed-path lifecycle | Operational inside the experimental gate | `close_node` + delta/continuous report closed path identifiers | Experimental |
 | Continuous or 24/7 service | Stale/incorrect when claimed as current | No supported command, scheduler, durable lifecycle, or operational contract | Explicitly unsupported |
 | Regulated-production readiness | Documentation aspiration only | No authenticated multi-user service, external signer, external anchor, or deployment evidence | Explicitly unsupported |
 
@@ -110,11 +110,11 @@ Every required release and post-merge gate passed.
 
 ### P1
 
-- GitHub issue #4: move HMAC signing out of the orchestrator into a separately
-  authenticated signer.
+- GitHub issue #4: Unix-socket signer landed (`argus signer`); independently
+  administered WORM storage for the key and chain tip remains.
 - Independently administered external/WORM anchoring before any higher-trust
   deployment claim.
-- Complete one bounded V2 lifecycle before exposing any continuous command.
+- Keep V2 continuous mode experimental until a supported CLI contract exists.
 
 ### P2
 

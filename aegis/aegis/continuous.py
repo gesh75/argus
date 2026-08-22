@@ -2,6 +2,9 @@
 
 Runs the specialized agents on a schedule and produces delta reports
 while every single tool call remains under the 7-layer Guardrail.
+
+V2 continuous mode is experimental and unsupported. Construction requires
+an explicit development-only opt-in. Collector failures propagate.
 """
 from __future__ import annotations
 
@@ -50,7 +53,7 @@ class ContinuousRunner:
         self.previous_nodes: set[str] = set(self.graph.g.nodes)
 
     def one_cycle(self) -> DeltaReport:
-        before = set(self.graph.g.nodes)
+        before = set(self.previous_nodes)
         for agent in self.agents:
             proposals = agent.propose()
             for prop in proposals:
@@ -59,18 +62,19 @@ class ContinuousRunner:
                 targets = prop.get("targets", [])
                 if tool and targets:
                     agent.run_authorized(tool, args, targets)
-        # Run correlation if present
         for agent in self.agents:
             if hasattr(agent, "derive_paths"):
                 agent.derive_paths()
         after = set(self.graph.g.nodes)
         new = after - before
+        gone = before - after
         report = DeltaReport(
             run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
             timestamp=datetime.now(UTC),
             new_observations=[n for n in new if not str(n).startswith("path-")],
             new_paths=[n for n in new if str(n).startswith("path-")],
-            summary=f"{len(new)} new nodes this cycle",
+            closed_paths=[n for n in gone if str(n).startswith("path-")],
+            summary=f"{len(new)} new / {len(gone)} closed this cycle",
         )
         self.previous_nodes = after
         save_graph(self.graph, self.persist_path)

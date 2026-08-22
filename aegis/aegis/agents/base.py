@@ -9,7 +9,6 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from ..evidence import EvidenceGraph, Observation
-from ..guardrail import Guardrail
 
 Collector = Callable[[str, list[str], list[str]], Sequence[Observation]]
 
@@ -19,7 +18,7 @@ class BaseAgent(ABC):
 
     def __init__(
         self,
-        guardrail: Guardrail,
+        guardrail,
         graph: EvidenceGraph,
         *,
         collector: Collector | None = None,
@@ -36,6 +35,22 @@ class BaseAgent(ABC):
         Never execute — only propose.
         """
         ...
+
+    def kinds_for(self, target: str | None = None) -> set[str]:
+        kinds: set[str] = set()
+        for _, data in self.graph.g.nodes(data=True):
+            if target and str(data.get("target") or "") != target:
+                continue
+            kind = data.get("kind")
+            if kind:
+                kinds.add(str(kind))
+        return kinds
+
+    def blob(self) -> str:
+        return " ".join(
+            f"{d.get('kind', '')} {d.get('summary', '')}"
+            for _, d in self.graph.g.nodes(data=True)
+        ).lower()
 
     def run_authorized(self, tool: str, args: list[str], targets: list[str]) -> list[Observation]:
         """The only way an agent may touch the world."""
