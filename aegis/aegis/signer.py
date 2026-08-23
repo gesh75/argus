@@ -24,8 +24,40 @@ from typing import Protocol
 MIN_AUDIT_KEY_LEN = 32
 MAX_MSG = 65_536
 MAX_MATERIAL = 32_768
+SIGNER_SOCKET_ENV = "ARGUS_SIGNER_SOCKET"
+SIGNER_SOCKET_NAME = "argus-signer.sock"
 _HEX = set("0123456789abcdef")
 _SO_PEERCRED = getattr(socket, "SO_PEERCRED", 17)
+
+
+def default_socket_path() -> str | None:
+    """Resolve a user-private signer socket path.
+
+    World-writable shared temp directories are never an implicit default
+    (CWE-377). Operators may still pass an explicit ``--socket`` path.
+    Preference: ``ARGUS_SIGNER_SOCKET``, then a user-owned, unshared
+    ``$XDG_RUNTIME_DIR`` / ``argus-signer.sock``.
+    """
+    explicit = os.environ.get(SIGNER_SOCKET_ENV, "").strip()
+    if explicit:
+        return explicit
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "").strip()
+    if runtime_dir and _is_private_runtime_dir(Path(runtime_dir)):
+        return str(Path(runtime_dir) / SIGNER_SOCKET_NAME)
+    return None
+
+
+def _is_private_runtime_dir(path: Path) -> bool:
+    """XDG runtime dirs must be user-owned and inaccessible to group/other."""
+    try:
+        st = path.stat()
+    except OSError:
+        return False
+    if not stat.S_ISDIR(st.st_mode):
+        return False
+    if st.st_uid != os.getuid():
+        return False
+    return (st.st_mode & 0o077) == 0
 
 
 class SignerError(Exception):

@@ -28,6 +28,7 @@ from .guardrail import AuditLog, Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
 from .sandbox import DockerSandbox, DryRunSandbox, LocalSandbox
+from .signer import default_socket_path
 
 DEFAULT_COMPOSE = Path(__file__).resolve().parents[2] / "targets" / "docker-compose.yml"
 
@@ -301,6 +302,14 @@ def cmd_signer(args) -> int:
     """Hold the HMAC key in a dedicated process (issue #4)."""
     from .signer import serve_forever
 
+    socket_path = args.socket or default_socket_path()
+    if not socket_path:
+        print(
+            "REFUSED: signer socket unset — pass --socket or set "
+            "ARGUS_SIGNER_SOCKET or XDG_RUNTIME_DIR",
+            file=sys.stderr,
+        )
+        return 2
     policy = Policy.load(args.policy)
     key = os.environ.get(policy.audit_key_env)
     if not key:
@@ -309,8 +318,8 @@ def cmd_signer(args) -> int:
     if len(key) < 32:
         print("REFUSED: audit key too short", file=sys.stderr)
         return 2
-    print(f"argus signer listening on {args.socket}", file=sys.stderr)
-    serve_forever(args.socket, key.encode())
+    print(f"argus signer listening on {socket_path}", file=sys.stderr)
+    serve_forever(socket_path, key.encode())
     return 0
 
 
@@ -436,8 +445,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sg.add_argument(
         "--socket",
-        default=os.environ.get("ARGUS_SIGNER_SOCKET", "/tmp/argus-signer.sock"),
-        help="unix domain socket path (also ARGUS_SIGNER_SOCKET)",
+        default=default_socket_path(),
+        help=(
+            "unix domain socket path (ARGUS_SIGNER_SOCKET, else "
+            "$XDG_RUNTIME_DIR/argus-signer.sock; no shared-temp default)"
+        ),
     )
     sg.set_defaults(func=cmd_signer)
     return p

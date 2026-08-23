@@ -26,6 +26,17 @@ def test_networkx_is_hash_locked() -> None:
     assert re.search(r"^networkx==[^\n]+\\$", lock, re.MULTILINE)
 
 
+def test_cryptography_is_pinned_against_pysec_2026_3552() -> None:
+    requirements = (AEGIS_ROOT / "requirements.txt").read_text().lower()
+    project = tomllib.loads((AEGIS_ROOT / "pyproject.toml").read_text())["project"]
+    dependencies = [dependency.lower() for dependency in project["dependencies"]]
+    lock = (AEGIS_ROOT / "requirements.lock").read_text().lower()
+
+    assert re.search(r"^cryptography>=50\.0\.0$", requirements, re.MULTILINE)
+    assert any(dependency.startswith("cryptography>=50.0.0") for dependency in dependencies)
+    assert re.search(r"^cryptography==50\.", lock, re.MULTILINE)
+
+
 def test_no_active_documentation_uses_the_invalid_short_audit_key() -> None:
     weak_command = "PENTEST_AUDIT_HMAC_KEY=" + "test"
     active_files = [
