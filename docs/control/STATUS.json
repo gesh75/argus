@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T07:43:53Z",
+  "generated_at": "2026-08-24T05:15:24Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "6f4d8326e8b99dd56f04df23079657d30798ae84",
-  "active_branch": "main",
-  "head_sha": "6f4d8326e8b99dd56f04df23079657d30798ae84",
+  "current_main_sha": "bb0734f0ab950d48ca25fd078e9e9b4c01a90043",
+  "active_branch": "cursor/ci-autofix-automation-bc4e",
+  "head_sha": "47ca53e230346c2e048cf5af94bbb2883f3c2e15",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "6f4d8326e8b99dd56f04df23079657d30798ae84",
+  "source_commit": "47ca53e230346c2e048cf5af94bbb2883f3c2e15",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "NOW complete; supervised defensive assessment release candidate; alpha runtime",
@@ -68,7 +68,7 @@
     "status": "passed",
     "command": "pip-audit -r requirements.lock --strict --desc",
     "known_vulnerabilities": 0,
-    "note": "The uv-created local Python 3.12 audit environment failed inside ensurepip before auditing; pinned pip-audit 2.10 completed successfully in the functional local tool environment. GitHub Python 3.12 remains authoritative."
+    "note": "Pinned cryptography>=50.0.0 to close PYSEC-2026-3552 (PKCS#7 CEK oracle in 49.0.0). GitHub Python 3.12 remains authoritative."
   },
   "package_build": {
     "status": "passed",
@@ -113,10 +113,10 @@
   "blockers": [],
   "next_action": "NONE — NOW increment complete. Start no NEXT item without separate authorization and a fresh branch from current main.",
   "documentation_freshness": {
-    "status": "final post-merge source snapshot",
+    "status": "CI autofix snapshot after cryptography 50 pin",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "6f4d8326e8b99dd56f04df23079657d30798ae84"
+    "source_commit": "47ca53e230346c2e048cf5af94bbb2883f3c2e15"
   },
   "completed_milestones": [
     {
