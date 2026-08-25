@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-23T02:13:45Z",
+  "generated_at": "2026-08-25T11:55:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "bb0734f0ab950d48ca25fd078e9e9b4c01a90043",
-  "active_branch": "feat/oob-signer-and-v2-agents",
-  "head_sha": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5",
+  "current_main_sha": "025492456d4e3ca8363d7210abd43d605373b663",
+  "active_branch": "cursor/ci-autofix-automation-a3ae",
+  "head_sha": "4dc831419a92d8401865ead324dcb677befadacc",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5",
+  "source_commit": "4dc831419a92d8401865ead324dcb677befadacc",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "NOW complete; supervised defensive assessment release candidate; alpha runtime",
@@ -128,10 +128,10 @@
   "blockers": [],
   "next_action": "Land PR #18 after pytest, Bandit, and pip-audit are green. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
   "documentation_freshness": {
-    "status": "PR #18 source snapshot",
+    "status": "CI autofix snapshot for squash-merge topology",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5"
+    "source_commit": "4dc831419a92d8401865ead324dcb677befadacc"
   },
   "completed_milestones": [
     {
