@@ -9,6 +9,8 @@ networkx>=3.2,<4
 anthropic>=0.40.0
 # Host audit (Windows/WinRM). Linux uses SSH via the sandbox; AD uses ldapsearch.
 pywinrm>=0.4.3
+# Transitive via pywinrm/pyspnego. Pin for PYSEC-2026-3552 (PKCS#7 CEK oracle).
+cryptography>=50.0.0
 # Web GUI
 fastapi>=0.110
 uvicorn[standard]>=0.29

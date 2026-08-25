@@ -263,8 +263,8 @@
       <div class="status-grid">
         <article class="status-card"><span>Repository</span><strong>gesh75/argus</strong><span class="badge warn">tracked</span></article>
         <article class="status-card"><span>Release target</span><strong>Argus 1.0 supervised defensive assessment release candidate</strong><span class="badge warn">in progress</span></article>
-        <article class="status-card"><span>Branch</span><strong>main</strong><span class="badge warn">canonical</span></article>
-        <article class="status-card"><span>Open PRs</span><strong>0</strong><span class="badge warn">clear</span></article>
+        <article class="status-card"><span>Branch</span><strong>feat/oob-signer-and-v2-agents</strong><span class="badge warn">canonical</span></article>
+        <article class="status-card"><span>Open PRs</span><strong>1</strong><span class="badge warn">review</span></article>
         <article class="status-card"><span>Open issues</span><strong>1</strong><span class="badge warn">tracked</span></article>
         <article class="status-card"><span>Release blockers</span><strong>0</strong><span class="badge warn">clear</span></article>
       </div>
@@ -276,9 +276,9 @@
         <p>Exact immutable identifiers and the current security-analysis state.</p>
       </div>
       <div class="status-grid">
-        <article class="status-card"><span>Current main</span><strong><code>6f4d8326e8b99dd56f04df23079657d30798ae84</code></strong></article>
-        <article class="status-card"><span>Generation HEAD</span><strong><code>6f4d8326e8b99dd56f04df23079657d30798ae84</code></strong></article>
-        <article class="status-card"><span>Source commit</span><strong><code>6f4d8326e8b99dd56f04df23079657d30798ae84</code></strong></article>
+        <article class="status-card"><span>Current main</span><strong><code>bb0734f0ab950d48ca25fd078e9e9b4c01a90043</code></strong></article>
+        <article class="status-card"><span>Generation HEAD</span><strong><code>4f82462a8aba7500a30ca1b686fee48d7a9e93f5</code></strong></article>
+        <article class="status-card"><span>Source commit</span><strong><code>4f82462a8aba7500a30ca1b686fee48d7a9e93f5</code></strong></article>
         <article class="status-card"><span>CodeQL</span><strong>passed</strong><span class="badge ok">passed</span></article>
       </div>
     </section>
@@ -307,7 +307,7 @@
         <div><div class="eyebrow">Evidence gates</div><h2>Phase roadmap</h2></div>
         <p>NOW closes before NEXT begins. LATER and DEFERRED do not imply current capability.</p>
       </div>
-      <div class="roadmap-grid"><article class="roadmap-column state-now"><h3>NOW</h3><ul><li>COMPLETE — supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21</li></ul></article><article class="roadmap-column state-next"><h3>NEXT</h3><ul><li>Complete one bounded operational V2 foundation</li><li>Move HMAC signing out of the orchestrator</li></ul></article><article class="roadmap-column state-later"><h3>LATER</h3><ul><li>Add an independently administered external anchor</li><li>Add browser-executed DOM security coverage</li></ul></article><article class="roadmap-column state-deferred"><h3>DEFERRED</h3><ul><li>Unattended continuous service</li><li>Production, regulated, network-exposed, or multi-user deployment</li></ul></article></div>
+      <div class="roadmap-grid"><article class="roadmap-column state-now"><h3>NOW</h3><ul><li>COMPLETE — supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21</li></ul></article><article class="roadmap-column state-next"><h3>NEXT</h3><ul><li>Complete one bounded operational V2 foundation (in review on PR #18)</li><li>Move HMAC signing out of the orchestrator (in review on PR #18)</li></ul></article><article class="roadmap-column state-later"><h3>LATER</h3><ul><li>Add an independently administered external anchor</li><li>Add browser-executed DOM security coverage</li></ul></article><article class="roadmap-column state-deferred"><h3>DEFERRED</h3><ul><li>Unattended continuous service</li><li>Production, regulated, network-exposed, or multi-user deployment</li></ul></article></div>
     </section>
 
     <section id="blockers">
@@ -318,7 +318,7 @@
       </div>
       <table>
         <thead><tr><th>Item</th><th>State</th><th>Impact</th><th>Owner</th></tr></thead>
-        <tbody><tr><th>Release verification</th><td><span class="badge warn">closed</span></td><td>none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed</td><td>completed by sole implementation session</td></tr><tr><th>Out-of-band signer</th><td><span class="badge warn">deferred issue #4</span></td><td>blocks higher-trust deployment, not supervised isolated-lab RC</td><td>future separately authorized increment</td></tr><tr><th>Operational V2 lifecycle</th><td><span class="badge warn">deferred by Path A</span></td><td>continuous mode remains experimental and unsupported</td><td>future separately authorized increment</td></tr></tbody>
+        <tbody><tr><th>Release verification</th><td><span class="badge warn">closed</span></td><td>none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed</td><td>completed by sole implementation session</td></tr><tr><th>Out-of-band signer</th><td><span class="badge warn">in review on PR #18</span></td><td>Unix-socket signer landed; independently administered WORM remains later</td><td>PR #18</td></tr><tr><th>Operational V2 lifecycle</th><td><span class="badge warn">in review on PR #18</span></td><td>continuous mode remains experimental and unsupported</td><td>PR #18</td></tr></tbody>
       </table>
     </section>
 
@@ -327,7 +327,7 @@
         <div><div class="eyebrow">Operator queue</div><h2>Next exact action</h2></div>
         <p>One executable action owns the NOW gate.</p>
       </div>
-      <div class="next-action">NONE — NOW increment complete. Start no NEXT item without separate authorization and a fresh branch from current main.</div>
+      <div class="next-action">Land PR #18 after pytest, Bandit, and pip-audit are green. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.</div>
     </section>
 
     <section id="architecture">
@@ -345,7 +345,7 @@
       </div>
       <div class="flow-grid">
         <article class="flow-panel"><h3>V1 execution flow</h3><ol class="flow"><li><span class="step-index">01</span><span>operator supplies explicit targets and profile</span></li><li><span class="step-index">02</span><span>target scope is normalized and checked</span></li><li><span class="step-index">03</span><span>high-risk mode requires exact approval</span></li><li><span class="step-index">04</span><span>guardrail authorizes the tool and arguments</span></li><li><span class="step-index">05</span><span>sandbox executes a bounded collector</span></li><li><span class="step-index">06</span><span>output is sanitized and normalized</span></li><li><span class="step-index">07</span><span>planner may propose the next bounded profile</span></li><li><span class="step-index">08</span><span>findings and proof-tagged paths are reported</span></li><li><span class="step-index">09</span><span>every decision and execution boundary is audited</span></li></ol></article>
-        <article class="flow-panel"><h3>V2 experimental flow</h3><ol class="flow"><li><span class="step-index">01</span><span>specialized agent proposals</span></li><li><span class="step-index">02</span><span>incomplete target and collector integration</span></li><li><span class="step-index">03</span><span>experimental EvidenceGraph</span></li><li><span class="step-index">04</span><span>non-release-grade global correlation</span></li><li><span class="step-index">05</span><span>non-transactional graph persistence</span></li><li><span class="step-index">06</span><span>gated ContinuousRunner</span></li><li><span class="step-index">07</span><span>no supported CLI or unattended loop</span></li></ol></article>
+        <article class="flow-panel"><h3>V2 experimental flow</h3><ol class="flow"><li><span class="step-index">01</span><span>specialized agent proposals from evidence</span></li><li><span class="step-index">02</span><span>operator-supplied targets and collector observations</span></li><li><span class="step-index">03</span><span>experimental EvidenceGraph</span></li><li><span class="step-index">04</span><span>asset-bound correlation</span></li><li><span class="step-index">05</span><span>checksummed atomic graph persistence</span></li><li><span class="step-index">06</span><span>gated ContinuousRunner</span></li><li><span class="step-index">07</span><span>no supported CLI or unattended loop</span></li></ol></article>
       </div>
     </section>
 
@@ -355,7 +355,7 @@
         <p>Local and GitHub gates are visible without converting pending work into a claim.</p>
       </div>
       <div class="evidence-grid"><article class="evidence-card"><span>Baseline tests</span><strong>279 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Release tests</span><strong>292 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Ruff</span><strong>passed-approved-baseline-comparison</strong><span class="badge warn">passed-approved-baseline-comparison</span></article><article class="evidence-card"><span>Bandit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Dependency audit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>CodeQL</span><strong>0 open alerts</strong><span class="badge ok">passed</span></article></div>
-      <div class="boundary" style="margin-top:1rem"><ul><li>292-test hash-locked Python 3.12 release-closeout regression passed</li><li>51 focused release, V2, web, and audit tests passed</li><li>123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed</li><li>Ruff comparison found no new or changed findings; every changed Python file passed</li><li>Bandit found no medium- or high-severity issue</li><li>Dependency audit found no known vulnerability</li><li>Clean sdist, wheel build, locked wheel install, and CLI smoke passed</li><li>Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved</li><li>Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved</li><li>PR CI and CodeQL passed on reviewed head 8f1fed7d88c821f926c332ea691f151c58d73dbd</li><li>post-merge main CI 30523751828 and CodeQL 30523751784 passed</li><li>post-merge open CodeQL alerts: 0</li><li>exactly one independent read-only review completed; all three findings were resolved before merge</li></ul></div>
+      <div class="boundary" style="margin-top:1rem"><ul><li>292-test hash-locked Python 3.12 release-closeout regression passed</li><li>51 focused release, V2, web, and audit tests passed</li><li>123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed</li><li>Ruff comparison found no new or changed findings; every changed Python file passed</li><li>Bandit found no medium- or high-severity issue</li><li>Dependency audit found no known vulnerability</li><li>Clean sdist, wheel build, locked wheel install, and CLI smoke passed</li><li>Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved</li><li>Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved</li><li>PR CI and CodeQL passed on reviewed head 8f1fed7d88c821f926c332ea691f151c58d73dbd</li><li>post-merge main CI 30523751828 and CodeQL 30523751784 passed</li><li>post-merge open CodeQL alerts: 0</li><li>exactly one independent read-only review completed; all three findings were resolved before merge</li><li>PR #18 CI fix: Bandit B108 closed by user-private signer socket default</li><li>PR #18 CI fix: cryptography 50.0.0 hash-locked for PYSEC-2026-3552</li><li>315-test hash-locked Python 3.12 suite passed locally after the CI fixes</li></ul></div>
     </section>
 
     <section id="decisions">
@@ -381,8 +381,8 @@
   </main>
 
   <footer>
-    <div><strong>Source commit:</strong> <code>6f4d8326e8b99dd56f04df23079657d30798ae84</code></div>
-    <div><strong>Last updated:</strong> <time datetime="2026-07-30T07:43:53Z">2026-07-30T07:43:53Z</time></div>
+    <div><strong>Source commit:</strong> <code>4f82462a8aba7500a30ca1b686fee48d7a9e93f5</code></div>
+    <div><strong>Last updated:</strong> <time datetime="2026-08-23T02:13:45Z">2026-08-23T02:13:45Z</time></div>
     <div>Argus · authorized defensive assessment only · no deployment performed</div>
   </footer>
 </body>

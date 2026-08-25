@@ -53,7 +53,11 @@ recovery, operations, and rollback semantics. It is tracked in GitHub issue #4.
 
 **✅ Short-term landed:** `AuditLog` now **fails closed on a weak audit key** (`MIN_AUDIT_KEY_LEN
 = 32`) — a placeholder/short key can no longer sign a "tamper-evident" chain (`guardrail.py`).
-**🔭 Remaining:** the full out-of-band signer process (orchestrator never holds the key).
+**✅ Signer process landed:** `argus signer --socket PATH` holds the key; the orchestrator
+connects via `ARGUS_SIGNER_SOCKET` and never loads `PENTEST_AUDIT_HMAC_KEY`. Signer
+unavailability is fail-closed. In-process signing remains the default when the socket env
+is unset (supervised isolated-lab compatibility).
+**Remaining:** independently administered WORM storage for the key and the chain tip. The signer process is landed (`argus signer --socket`); peer-uid and bounded messages are in place.
 
 > *Best practice:* "the agent never touches the signing keys" (ROE Gate, reference-monitor /
 > Anderson 1972); "the key sits outside the log volume so an attacker who can write the log
@@ -122,8 +126,7 @@ enabled — so a human catches the misconfiguration at setup time rather than af
 
 ## Status
 **Done:** P0 (CI + supply-chain), P1.5/6/7, P2.8/9/10, and the P1.4 short-term key-strength gate.
-**Remaining:** P1.4 full out-of-band signer process and P1.5 independently administered
-WORM integration. The local JSON consistency anchor is not a remote-object adapter.
+**Remaining:** P1.5 independently administered WORM integration. The local JSON consistency anchor is not a remote-object adapter. P1.4 signer process is landed.
 
 ## Suggested sequencing (remaining)
 

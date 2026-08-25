@@ -1,9 +1,9 @@
 # Argus V2 Roadmap Status
 
-> **Status: experimental scaffolding, explicitly gated and unsupported.**
+> **Status: experimental, explicitly gated and unsupported.**
 > The canonical active roadmap is [`control/ROADMAP.md`](control/ROADMAP.md).
 
-**Last reconciled:** 2026-07-30
+**Last reconciled:** 2026-08-22
 
 ## Binding status
 
@@ -16,14 +16,14 @@ scheduled operation is approved.
 
 | Area | Classification | Release evidence |
 |---|---|---|
-| EvidenceGraph | Implemented but not release-grade | NetworkX graph and proof tags exist; path identity is random |
-| Specialized-agent framework | Scaffold only | base authorization hook exists; Host, AD, and Web agents propose nothing |
-| Recon agent | Scaffold only | initial proposal has no explicit target |
-| ContinuousRunner | Implemented but not integrated | targetless proposals are skipped; broad exception suppression was removed and collector failures propagate; no collector lifecycle |
-| CorrelationAgent | Implemented but incorrect for operational use | globally combines categories instead of asset-bound relationships |
-| DeltaAgent | Scaffold only | set delta exists; closed-path lifecycle is not demonstrated |
-| Graph persistence | Scaffold only | direct JSON overwrite; no schema, lock, checksum, atomic durability, strict recovery, or typed timestamp restoration |
-| V2 UI | Documentation only | no interactive evidence/path product |
+| EvidenceGraph | Implemented but not release-grade | NetworkX graph and proof tags exist; path identity is deterministic |
+| Specialized-agent framework | Operational inside the experimental gate | `run_authorized` collects and records; Host, AD, and Web propose from evidence and are idempotent |
+| Recon agent | Operational inside the experimental gate | initial proposal uses operator-supplied targets |
+| ContinuousRunner | Implemented but not integrated | targetless proposals are skipped; broad exception suppression was removed and collector failures propagate; closed-path reports land on `DeltaReport` |
+| CorrelationAgent | Asset-bound under the experimental gate | paths require a shared target |
+| DeltaAgent | Operational inside the experimental gate | set delta plus `close_node` closed-path lifecycle |
+| Graph persistence | Atomic, schema-versioned, checksummed JSON | temp + `os.replace`; checksum mismatch loads empty |
+| V2 UI | Operator console in the App Builder workspace | lab-sim is fixture-backed and labeled; not a live packet source |
 
 ## Re-entry gate
 
@@ -38,11 +38,17 @@ typed proposal
 → EvidenceGraph update
 → asset-bound correlation
 → deterministic path identity
-→ transactional persistence
-→ truthful new / changed / closed delta
+→ delta (new / changed / closed)
+→ durable graph persistence
 ```
 
-It must pass save→reload→rerun→delta tests, be idempotent, expose only a bounded
-dry-run-first command, and remain opt-in. Until that binary gate passes, V2 is
-not operational, autonomous, continuous, production-ready, regulated-ready, or
-safe to leave running.
+That increment already exists as experimental code. Remaining before any
+supported continuous command: independently administered WORM storage, a
+supported CLI contract, and an operator-facing runbook.
+
+## Non-goals carried forward
+
+- Unattended 24/7 sensing
+- Model-generated shell commands
+- Weakening scope, tool, approval, or sandbox boundaries
+- Claiming the local JSON file is WORM

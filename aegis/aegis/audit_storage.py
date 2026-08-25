@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import errno
-import hashlib
 import hmac
 import json
 import math
@@ -18,6 +17,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Protocol, Self
+
+from .signer import InProcessSigner, Signer, SignerError
 
 try:
     import fcntl
@@ -35,6 +36,17 @@ type JsonScalar = None | bool | int | float | str
 type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+
+def hmac_hex(
+    material: bytes, *, key: bytes | None = None, signer: Signer | None = None
+) -> str:
+    """HMAC-SHA256 hex digest via an out-of-band signer or an in-process key."""
+    try:
+        mac = signer if signer is not None else InProcessSigner(key or b"")
+        return mac.hmac_sha256(material)
+    except SignerError as exc:
+        raise AuditStorageError(AuditFailureCode.INVALID_HMAC) from exc
 
 
 class AuditFailureCode(StrEnum):
@@ -428,13 +440,22 @@ class AuditStorage:
         self,
         audit_path: Path,
         *,
-        key: bytes,
+        key: bytes | None = None,
+        signer: Signer | None = None,
         chained: bool,
         anchor_path: Path | None,
         _io: _AuditIO | None = None,
     ) -> None:
         self.audit_path = Path(audit_path)
-        self.key = key
+        if signer is None:
+            if not key:
+                raise AuditStorageError(AuditFailureCode.INVALID_HMAC)
+            signer = InProcessSigner(key)
+            self.key = key
+        else:
+            # Socket signer: never retain key material on the storage object.
+            self.key = key or b""
+        self._signer = signer
         self.chained = chained
         self.anchor_path = Path(anchor_path) if anchor_path is not None else None
         self._io = _io or _PosixAuditIO()
@@ -540,7 +561,7 @@ class AuditStorage:
                 )
             except AuditStorageError as exc:
                 if isinstance(exc.__cause__, FileNotFoundError):
-                    return replay_bytes(b"", key=self.key)
+                    return replay_bytes(b"", key=self.key, signer=self._signer)
                 raise
             chunks: list[bytes] = []
             while True:
@@ -548,7 +569,7 @@ class AuditStorage:
                 if not chunk:
                     break
                 chunks.append(chunk)
-            return replay_bytes(b"".join(chunks), key=self.key)
+            return replay_bytes(b"".join(chunks), key=self.key, signer=self._signer)
         except AuditStorageError:
             raise
         except OSError as exc:
@@ -577,7 +598,8 @@ class AuditStorage:
             raise AuditStorageError(AuditFailureCode.INVALID_SCHEMA)
         encoded, result = encode_v2_record(
             event,
-            key=self.key,
+            key=self.key or None,
+            signer=self._signer,
             seq=replay.count + 1,
             prev=replay.tip,
             ts=ts,
@@ -746,7 +768,11 @@ def decode_v2_record(
 
 
 def verify_v1_hmac(
-    record_data: dict[str, JsonValue], *, key: bytes, expected_prev: str
+    record_data: dict[str, JsonValue],
+    *,
+    key: bytes | None = None,
+    signer: Signer | None = None,
+    expected_prev: str,
 ) -> V1Record:
     record = decode_v1_record(record_data, seq=0)
     if record.chained and record.prev != expected_prev:
@@ -755,7 +781,7 @@ def verify_v1_hmac(
     stored = body_data.pop("hmac")
     body = canonical_v1_body(body_data)
     signed = expected_prev.encode() + body if record.chained else body
-    expected = hmac.new(key, signed, hashlib.sha256).hexdigest()
+    expected = hmac_hex(signed, key=key, signer=signer)
     if not hmac.compare_digest(stored, expected):
         raise AuditStorageError(AuditFailureCode.INVALID_HMAC)
     return record
@@ -764,7 +790,8 @@ def verify_v1_hmac(
 def verify_v2_hmac(
     record_data: dict[str, JsonValue],
     *,
-    key: bytes,
+    key: bytes | None = None,
+    signer: Signer | None = None,
     expected_seq: int,
     expected_prev: str,
 ) -> V2Record:
@@ -774,9 +801,7 @@ def verify_v2_hmac(
     body_data = dict(record_data)
     stored = body_data.pop("hmac")
     body = canonical_v2_body(body_data)
-    expected = hmac.new(
-        key, V2_DOMAIN_SEPARATOR + body, hashlib.sha256
-    ).hexdigest()
+    expected = hmac_hex(V2_DOMAIN_SEPARATOR + body, key=key, signer=signer)
     if not hmac.compare_digest(stored, expected):
         raise AuditStorageError(AuditFailureCode.INVALID_HMAC)
     return record
@@ -786,7 +811,9 @@ def _raise_at_record(error: AuditStorageError, number: int) -> None:
     raise AuditStorageError(error.code, record_number=number) from error
 
 
-def replay_bytes(raw: bytes, *, key: bytes) -> ReplayResult:
+def replay_bytes(
+    raw: bytes, *, key: bytes | None = None, signer: Signer | None = None
+) -> ReplayResult:
     if not raw:
         return ReplayResult(LogState.EMPTY, (), 0, GENESIS, None)
     if not raw.endswith(b"\n"):
@@ -809,6 +836,7 @@ def replay_bytes(raw: bytes, *, key: bytes) -> ReplayResult:
                 record = verify_v2_hmac(
                     data,
                     key=key,
+                    signer=signer,
                     expected_seq=sequence,
                     expected_prev=tip,
                 )
@@ -816,7 +844,9 @@ def replay_bytes(raw: bytes, *, key: bytes) -> ReplayResult:
             else:
                 if saw_v2:
                     raise AuditStorageError(AuditFailureCode.INVALID_VERSION)
-                record = verify_v1_hmac(data, key=key, expected_prev=tip)
+                record = verify_v1_hmac(
+                    data, key=key, signer=signer, expected_prev=tip
+                )
                 if v1_mode is None:
                     v1_mode = record.chained
                 elif v1_mode is not record.chained:
@@ -853,7 +883,8 @@ def replay_bytes(raw: bytes, *, key: bytes) -> ReplayResult:
 def encode_v2_record(
     event: Mapping[str, JsonValue],
     *,
-    key: bytes,
+    key: bytes | None = None,
+    signer: Signer | None = None,
     seq: int,
     prev: str,
     ts: int | float,
@@ -878,8 +909,8 @@ def encode_v2_record(
         **dict(event),
     }
     canonical = canonical_v2_body(body)
-    digest = hmac.new(
-        key, V2_DOMAIN_SEPARATOR + canonical, hashlib.sha256
-    ).hexdigest()
+    digest = hmac_hex(
+        V2_DOMAIN_SEPARATOR + canonical, key=key, signer=signer
+    )
     encoded = _canonical({**body, "hmac": digest}, ensure_ascii=False) + b"\n"
     return encoded, AppendResult(seq=seq, hmac=digest, ts=ts)

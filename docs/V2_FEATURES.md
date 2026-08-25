@@ -32,10 +32,9 @@ complete the V2 lifecycle.
 - no supported continuous command;
 - no unattended or 24/7 service;
 - no production or regulated readiness;
-- no interactive V2 evidence/path UI;
-- no out-of-band signer;
+- no live packet source in the operator console (lab-sim is fixture-backed);
+- out-of-band signer exists (`argus signer`) but is not independently administered WORM;
 - no external/WORM anchor;
-- no demonstrated closed-path lifecycle;
 - no claim that local Ollama alone makes regulated data handling compliant.
 
 The complete next milestone is specified in

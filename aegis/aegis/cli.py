@@ -28,6 +28,7 @@ from .guardrail import AuditLog, Guardrail, GuardrailError
 from .orchestrator import Orchestrator, default_plan
 from .reporting import write_all
 from .sandbox import DockerSandbox, DryRunSandbox, LocalSandbox
+from .signer import default_socket_path
 
 DEFAULT_COMPOSE = Path(__file__).resolve().parents[2] / "targets" / "docker-compose.yml"
 
@@ -297,6 +298,31 @@ def cmd_verify(args) -> int:
     return 0
 
 
+def cmd_signer(args) -> int:
+    """Hold the HMAC key in a dedicated process (issue #4)."""
+    from .signer import serve_forever
+
+    socket_path = args.socket or default_socket_path()
+    if not socket_path:
+        print(
+            "REFUSED: signer socket unset — pass --socket or set "
+            "ARGUS_SIGNER_SOCKET or XDG_RUNTIME_DIR",
+            file=sys.stderr,
+        )
+        return 2
+    policy = Policy.load(args.policy)
+    key = os.environ.get(policy.audit_key_env)
+    if not key:
+        print(f"REFUSED: audit key env {policy.audit_key_env} unset", file=sys.stderr)
+        return 2
+    if len(key) < 32:
+        print("REFUSED: audit key too short", file=sys.stderr)
+        return 2
+    print(f"argus signer listening on {socket_path}", file=sys.stderr)
+    serve_forever(socket_path, key.encode())
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="aegis",
@@ -412,6 +438,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     v = sub.add_parser("verify", help="print loaded policy")
     v.set_defaults(func=cmd_verify)
+
+    sg = sub.add_parser(
+        "signer",
+        help="run the out-of-band HMAC signer so the orchestrator never holds the key (#4)",
+    )
+    sg.add_argument(
+        "--socket",
+        default=default_socket_path(),
+        help=(
+            "unix domain socket path (ARGUS_SIGNER_SOCKET, else "
+            "$XDG_RUNTIME_DIR/argus-signer.sock; no shared-temp default)"
+        ),
+    )
+    sg.set_defaults(func=cmd_signer)
     return p
 
 

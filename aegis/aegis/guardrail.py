@@ -33,6 +33,7 @@ from .audit_storage import (
     ReplayResult,
 )
 from .config import Policy
+from .signer import Signer, SignerError, UnixSocketSigner
 
 _SHELL_METACHARS = re.compile(r"[;&|`$><\n\r\\]|\$\(")
 _DOTTED = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:/(\d{1,2}))?$")
@@ -106,29 +107,45 @@ def canon_network(token: str) -> ipaddress.IPv4Network:
 # Minimum audit-key length (#4). The documented key is `openssl rand -hex 32` (64 chars);
 # we fail closed below 32 so a weak/placeholder key can't sign a "tamper-evident" chain.
 MIN_AUDIT_KEY_LEN = 32
+SIGNER_SOCKET_ENV = "ARGUS_SIGNER_SOCKET"
+
+
+def _audit_credentials(policy: Policy) -> tuple[bytes | None, Signer | None]:
+    """Prefer an out-of-band signer so the orchestrator never holds the key (#4)."""
+    socket_path = os.environ.get(SIGNER_SOCKET_ENV, "").strip()
+    if socket_path:
+        signer = UnixSocketSigner(socket_path)
+        try:
+            signer.ping()
+        except SignerError as exc:
+            raise GuardrailError("audit signer unavailable") from exc
+        return None, signer
+    key = os.environ.get(policy.audit_key_env)
+    if not key:
+        raise GuardrailError(
+            f"audit key env {policy.audit_key_env} unset — refusing to run unaudited"
+        )
+    if len(key) < MIN_AUDIT_KEY_LEN:
+        raise GuardrailError(
+            f"audit key too short ({len(key)}<{MIN_AUDIT_KEY_LEN} chars) — a weak key "
+            f"makes the chain forgeable; generate one with `openssl rand -hex 32`"
+        )
+    return key.encode(), None
 
 
 class AuditLog:
     """Compatibility façade over the transactional audit storage boundary."""
 
     def __init__(self, policy: Policy):
-        key = os.environ.get(policy.audit_key_env)
-        if not key:
-            raise GuardrailError(
-                f"audit key env {policy.audit_key_env} unset — refusing to run unaudited"
-            )
-        if len(key) < MIN_AUDIT_KEY_LEN:
-            raise GuardrailError(
-                f"audit key too short ({len(key)}<{MIN_AUDIT_KEY_LEN} chars) — a weak key "
-                f"makes the chain forgeable; generate one with `openssl rand -hex 32`"
-            )
-        self._key = key.encode()
+        key, signer = _audit_credentials(policy)
+        self._key = key
         self._path = policy.audit_path
         self._chained = policy.audit_chained
         self._anchor_path = policy.audit_anchor_path
         self._storage = AuditStorage(
             self._path,
-            key=self._key,
+            key=key,
+            signer=signer,
             chained=self._chained,
             anchor_path=self._anchor_path,
         )
@@ -277,19 +294,12 @@ class _DiagnosticAuditLog:
     """Read-only audit inspection and explicitly bounded anchor recovery."""
 
     def __init__(self, policy: Policy) -> None:
-        key = os.environ.get(policy.audit_key_env)
-        if not key:
-            raise GuardrailError(
-                f"audit key env {policy.audit_key_env} unset — refusing unauthenticated audit"
-            )
-        if len(key) < MIN_AUDIT_KEY_LEN:
-            raise GuardrailError(
-                f"audit key too short ({len(key)}<{MIN_AUDIT_KEY_LEN} chars)"
-            )
+        key, signer = _audit_credentials(policy)
         self._anchor_path = policy.audit_anchor_path
         self._storage = AuditStorage(
             policy.audit_path,
-            key=key.encode(),
+            key=key,
+            signer=signer,
             chained=policy.audit_chained,
             anchor_path=policy.audit_anchor_path,
         )
