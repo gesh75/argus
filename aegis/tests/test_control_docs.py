@@ -87,10 +87,11 @@ def _validate_shallow_source_topology(
         assert pull_request_head["ref"] == status["active_branch"]
         return
 
-    assert event["ref"] == "refs/heads/main"
-    assert event["after"] == current_head
-    assert status["current_main_sha"] in parents
-    assert len(parents) == 2
+        assert event["ref"] == "refs/heads/main"
+        assert event["after"] == current_head
+        assert status["current_main_sha"] in parents
+        # Squash-merges onto main have one parent; merge commits have two.
+        assert len(parents) in {1, 2}
 
 
 def test_dashboard_generation_is_byte_identical(tmp_path: Path) -> None:
@@ -237,6 +238,26 @@ def test_shallow_source_topology_accepts_main_push_merge() -> None:
         status=status,
         raw_head=raw_head,
         current_head="merge",
+        event=event,
+    )
+
+
+def test_shallow_source_topology_accepts_main_push_squash() -> None:
+    status = {
+        "source_commit": "source",
+        "current_main_sha": "base",
+        "active_branch": "feat/release",
+    }
+    raw_head = "tree tree\nparent base\n\nSquash merge (#18)"
+    event = {
+        "ref": "refs/heads/main",
+        "after": "squash",
+    }
+
+    _validate_shallow_source_topology(
+        status=status,
+        raw_head=raw_head,
+        current_head="squash",
         event=event,
     )
 
