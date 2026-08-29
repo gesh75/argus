@@ -84,10 +84,15 @@ def canon_network(token: str) -> ipaddress.IPv4Network:
     Raises ValueError on anything that is not an unambiguous IPv4 literal/CIDR.
     """
     t = token
-    if _HEX.match(t):
-        return ipaddress.ip_network(ipaddress.ip_address(int(t, 16)))
-    if _PURE_INT.match(t):  # decimal integer form, e.g. 2887778305
-        return ipaddress.ip_network(ipaddress.ip_address(int(t)))
+    if _HEX.match(t) or _PURE_INT.match(t):
+        # Decimal/hex packed forms are a documented IPv4 obfuscation. Values that
+        # do not fit in 32 bits become IPv6 under ipaddress.ip_address(int), which
+        # then TypeErrors in _in_scope (v4 vs v6) instead of failing closed.
+        value = int(t, 16) if _HEX.match(t) else int(t)
+        addr = ipaddress.ip_address(value)
+        if not isinstance(addr, ipaddress.IPv4Address):
+            raise ValueError(f"not an unambiguous IPv4 literal: {token!r}")
+        return ipaddress.ip_network(addr)
     m = _DOTTED.match(t)
     if not m:
         raise ValueError(f"not an unambiguous IPv4 literal: {token!r}")
@@ -472,7 +477,9 @@ class Guardrail:
         # Longest-prefix-match wins (firewall semantics): the most specific matching
         # rule decides. A lab /24 allow correctly overrides a broad /12 deny, while a
         # /32 deny carved out *inside* the allowed /24 still wins and is rejected.
-        deny = [d for d in self.policy.denied_networks if net.subnet_of(d)]
+        # Deny matching uses overlap, not subnet_of: a parent CIDR (172.30.0.0/24)
+        # is not a subnet of a /32 carve-out, but scanning it would still hit that host.
+        deny = [d for d in self.policy.denied_networks if net.overlaps(d)]
         if deny and max(d.prefixlen for d in deny) >= max(a.prefixlen for a in allow):
             return False
         return net.prefixlen >= 24 or net.num_addresses == 1

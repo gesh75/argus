@@ -3,7 +3,7 @@
 > **Status: experimental, explicitly gated and unsupported.**
 > The canonical active roadmap is [`control/ROADMAP.md`](control/ROADMAP.md).
 
-**Last reconciled:** 2026-08-22
+**Last reconciled:** 2026-08-29
 
 ## Binding status
 
@@ -24,6 +24,7 @@ scheduled operation is approved.
 | DeltaAgent | Operational inside the experimental gate | set delta plus `close_node` closed-path lifecycle |
 | Graph persistence | Atomic, schema-versioned, checksummed JSON | temp + `os.replace`; checksum mismatch loads empty |
 | V2 UI | Operator console in the App Builder workspace | lab-sim is fixture-backed and labeled; not a live packet source |
+| DOM fixture inventory | Landed as pytest contract | `tests/test_dom_suite.py`; Playwright live-page execution remains LATER |
 
 ## Re-entry gate
 
