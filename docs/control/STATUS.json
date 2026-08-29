@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-29T07:45:00Z",
+  "generated_at": "2026-08-29T07:40:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "025492456d4e3ca8363d7210abd43d605373b663",
-  "active_branch": "main",
-  "head_sha": "025492456d4e3ca8363d7210abd43d605373b663",
+  "current_main_sha": "12b2bc98d440767ad921cfc63f00782929dc6855",
+  "active_branch": "cursor/ci-autofix-automation-7a7a",
+  "head_sha": "f7675ed47f4eab5d8e61822dea46d2800c061801",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "025492456d4e3ca8363d7210abd43d605373b663",
+  "source_commit": "f7675ed47f4eab5d8e61822dea46d2800c061801",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "NOW complete; PR #18 on main; supervised defensive assessment release candidate; alpha runtime",
@@ -120,10 +120,10 @@
   "blockers": [],
   "next_action": "PR #18 is on main. Do not enable unattended continuous mode. Do not weaken scope, approval, or sandbox boundaries. Independently administered WORM remains later.",
   "documentation_freshness": {
-    "status": "PR #18 merged snapshot",
+    "status": "squash-merge topology CI snapshot",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "025492456d4e3ca8363d7210abd43d605373b663"
+    "source_commit": "f7675ed47f4eab5d8e61822dea46d2800c061801"
   },
   "completed_milestones": [
     {
