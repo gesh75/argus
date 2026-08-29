@@ -9,10 +9,10 @@
 
 > **Run supervised defensive assessments inside an explicitly authorized, separately verified lab.** Argus turns bounded read-only collection into proof-annotated findings behind a fail-closed guardrail.
 
-![tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
-![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
+![audit](https://img.shields.io/badge/audit-OOB%20HMAC%20signer-8a5cf6)
 ![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
 ![scope](https://img.shields.io/badge/scope-network%20%C2%B7%20host%20%C2%B7%20AD%20%C2%B7%20web-1f6feb)
 
@@ -32,7 +32,7 @@ If you have watched an "AI security tool" hallucinate a critical finding with no
 - **Read-only by default.** No exploitation, credential spraying, writes, or DoS. Credentialed checks use null/guest/audit-mode only. The one component that can emit beyond recon — the PoC verifier — is triple-gated to an isolated lab.
 - **Evidence or it didn't happen.** Every attack path is tagged `proof: observed` (every link backed by collected evidence) or `proof: theoretical` (plausible, not yet demonstrated). No silent guesses.
 - **Operator-selected analysis.** Use cloud Claude only for approved non-sensitive data, local Ollama to avoid cloud egress, or the offline heuristic engine. Local processing reduces data movement; it is not a compliance guarantee.
-- **Tamper-evident.** Every authorize / exec / deny is written to an HMAC-SHA256 chained audit log; `argus audit` replays and verifies the whole chain.
+- **Tamper-evident, out-of-band.** Every authorize / exec / deny is HMAC-SHA256 chained. With `ARGUS_SIGNER_SOCKET` the orchestrator never holds `PENTEST_AUDIT_HMAC_KEY`; `argus signer` attests over a 0600 unix socket and fail-closes if the signer is down. In-process signing remains the isolated-lab default. `argus audit` replays and verifies the whole chain.
 
 ## How it works
 
@@ -103,7 +103,7 @@ flowchart LR
 | Findings | isolated, often unverified | **chained attack paths, tagged observed/theoretical** |
 | AI privacy | cloud-only | **Claude · local Ollama · fully offline** |
 | Exploitation | active by default | **read-only; PoC is triple-gated to an isolated lab** |
-| Auditability | logs, maybe | **HMAC-chained, tamper-evident, self-verifying** |
+| Auditability | logs, maybe | **OOB HMAC signer, tamper-evident, self-verifying** |
 
 ## Quickstart
 
@@ -111,7 +111,8 @@ flowchart LR
 cd aegis
 python3.12 -m venv .venv && . .venv/bin/activate
 python -m pip install --require-hashes -r requirements.lock
-export PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32)   # required — refuses to run unaudited
+export PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32)   # required unless ARGUS_SIGNER_SOCKET is set
+# optional: argus signer  — HMAC-SHA256 over a 0600 unix socket; signer down = fail-closed
 # optional AI: export ANTHROPIC_API_KEY=…   or   export AEGIS_OLLAMA_MODEL=qwen2.5:7b-instruct
 
   # Localhost-only web console; dry-run is server-enforced by default
@@ -156,7 +157,7 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Tests
 
-Current release-closeout collection: **292 tests** on Python 3.12. Historical counts in the build log and phase delivery reports remain labeled snapshots.
+Current collection after PR #18: **315 tests** on Python 3.12 (292 was the supervised V1 closeout snapshot). Historical counts in the build log remain labeled snapshots.
 
 ```bash
 cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
