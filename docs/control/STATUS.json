@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-29T08:20:00Z",
+  "generated_at": "2026-08-29T08:22:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
-  "active_branch": "feat/finish-v1-rc-closeout",
-  "head_sha": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
+  "current_main_sha": "567bffb3cb2253eb7beecbdf318824abdc8981b0",
+  "active_branch": "main",
+  "head_sha": "567bffb3cb2253eb7beecbdf318824abdc8981b0",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
+  "source_commit": "567bffb3cb2253eb7beecbdf318824abdc8981b0",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
-  "maturity": "NOW complete; PR #18 signer and V2 foundation landed; overlap deny and DOM fixtures this increment; alpha runtime",
+  "maturity": "NOW complete; PR #18 and #26 on main; supervised defensive assessment release candidate; alpha runtime",
   "supported_deployment_modes": [
     "supervised, explicitly authorized isolated-lab assessment",
     "Python 3.12+ POSIX macOS/Linux controller",
@@ -103,11 +103,11 @@
   },
   "open_pull_requests": [],
   "merged_pull_request": {
-    "number": 18,
-    "title": "feat: out-of-band HMAC signer and operational V2 agent proposals",
-    "url": "https://github.com/gesh75/argus/pull/18",
-    "head_sha": "025492456d4e3ca8363d7210abd43d605373b663",
-    "merge_sha": "025492456d4e3ca8363d7210abd43d605373b663"
+    "number": 26,
+    "title": "fix: overlap deny, squash-merge CI, DOM fixtures, truthful dashboard",
+    "url": "https://github.com/gesh75/argus/pull/26",
+    "head_sha": "567bffb3cb2253eb7beecbdf318824abdc8981b0",
+    "merge_sha": "567bffb3cb2253eb7beecbdf318824abdc8981b0"
   },
   "open_issues": [
     {
@@ -124,12 +124,12 @@
     }
   ],
   "blockers": [],
-  "next_action": "Merge feat/finish-v1-rc-closeout. Close issue #4. Supersede PRs #22 and #25. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
+  "next_action": "Supervised V1 RC is complete. Independently administered WORM (issue #23) and Playwright CI (issue #24) remain LATER. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
   "documentation_freshness": {
-    "status": "PR #18 on main; overlap deny, squash-merge CI, and DOM fixtures this increment",
+    "status": "PR #26 squash-merged snapshot; source_commit is the merge SHA",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "c56deaba06c070e2db45b84a15f6c85a2729dbf5"
+    "source_commit": "567bffb3cb2253eb7beecbdf318824abdc8981b0"
   },
   "completed_milestones": [
     {
@@ -164,8 +164,8 @@
     },
     {
       "name": "Layer-1 overlap deny, squash-merge CI, and DOM fixture inventory",
-      "evidence": "feat/finish-v1-rc-closeout (supersedes PR #22)",
-      "state": "this increment"
+      "evidence": "PR #26; squash-merge 567bffb3cb2253eb7beecbdf318824abdc8981b0",
+      "state": "merged"
     }
   ],
   "roadmap": {
@@ -176,7 +176,7 @@
     "NEXT": [
       "COMPLETE \u2014 bounded operational V2 foundation (PR #18)",
       "COMPLETE \u2014 HMAC signing moved out of the orchestrator (PR #18 / issue #4)",
-      "THIS INCREMENT \u2014 Layer-1 overlap deny, squash-merge CI, DOM fixture inventory"
+      "COMPLETE \u2014 Layer-1 overlap deny, squash-merge CI, DOM fixture inventory (PR #26)"
     ],
     "LATER": [
       "Independently administered WORM evidence store (issue #23)",
@@ -208,9 +208,9 @@
     },
     {
       "item": "Layer-1 overlap deny and squash-merge CI",
-      "state": "this increment",
+      "state": "closed",
       "impact": "parent CIDR cannot scan a /32 carve-out; control-docs topology accepts one-parent squash-merges",
-      "owner": "feat/finish-v1-rc-closeout"
+      "owner": "PR #26"
     }
   ],
   "architecture": [
@@ -263,7 +263,8 @@
     "Layer-1 deny matching uses overlaps() so a parent CIDR cannot scan a /32 carve-out",
     "Packed integer/hex tokens that are not IPv4 deny instead of crashing",
     "Control-docs CI accepts one-parent squash-merges onto main",
-    "DOM fixture inventory and static-console textContent contract landed"
+    "DOM fixture inventory and static-console textContent contract landed",
+    "PR #26 squash-merged to main as 567bffb3cb2253eb7beecbdf318824abdc8981b0"
   ],
   "control_links": [
     {
