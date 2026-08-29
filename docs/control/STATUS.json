@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-29T08:10:00Z",
+  "generated_at": "2026-08-29T08:20:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "12b2bc98d440767ad921cfc63f00782929dc6855",
-  "active_branch": "main",
-  "head_sha": "12b2bc98d440767ad921cfc63f00782929dc6855",
+  "current_main_sha": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
+  "active_branch": "feat/finish-v1-rc-closeout",
+  "head_sha": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "12b2bc98d440767ad921cfc63f00782929dc6855",
+  "source_commit": "c56deaba06c070e2db45b84a15f6c85a2729dbf5",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
-  "maturity": "NOW complete; PR #18 on main; supervised defensive assessment release candidate; alpha runtime",
+  "maturity": "NOW complete; PR #18 signer and V2 foundation landed; overlap deny and DOM fixtures this increment; alpha runtime",
   "supported_deployment_modes": [
     "supervised, explicitly authorized isolated-lab assessment",
     "Python 3.12+ POSIX macOS/Linux controller",
@@ -111,19 +111,25 @@
   },
   "open_issues": [
     {
-      "number": 4,
-      "title": "Move the HMAC audit signing key out-of-band from the tool runner",
-      "url": "https://github.com/gesh75/argus/issues/4",
+      "number": 23,
+      "title": "LATER \u2014 Independently administered WORM storage for the HMAC key and chain tip",
+      "url": "https://github.com/gesh75/argus/issues/23",
+      "release_blocker": false
+    },
+    {
+      "number": 24,
+      "title": "LATER \u2014 Playwright execution of the DOM fixture inventory",
+      "url": "https://github.com/gesh75/argus/issues/24",
       "release_blocker": false
     }
   ],
   "blockers": [],
-  "next_action": "PR #18 is on main. Do not enable unattended continuous mode. Do not weaken scope, approval, or sandbox boundaries. Independently administered WORM remains later.",
+  "next_action": "Merge feat/finish-v1-rc-closeout. Close issue #4. Supersede PRs #22 and #25. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
   "documentation_freshness": {
-    "status": "PR #18 merged snapshot; source_commit is HEAD parent for the following docs commit",
+    "status": "PR #18 on main; overlap deny, squash-merge CI, and DOM fixtures this increment",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "12b2bc98d440767ad921cfc63f00782929dc6855"
+    "source_commit": "c56deaba06c070e2db45b84a15f6c85a2729dbf5"
   },
   "completed_milestones": [
     {
@@ -155,20 +161,26 @@
       "name": "Out-of-band HMAC signer and operational V2 agents",
       "evidence": "PR #18; merge 025492456d4e3ca8363d7210abd43d605373b663",
       "state": "merged"
+    },
+    {
+      "name": "Layer-1 overlap deny, squash-merge CI, and DOM fixture inventory",
+      "evidence": "feat/finish-v1-rc-closeout (supersedes PR #22)",
+      "state": "this increment"
     }
   ],
   "roadmap": {
     "NOW": [
-      "COMPLETE — supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21",
-      "COMPLETE — out-of-band HMAC signer and operational V2 agents merged as 025492456d4e3ca8363d7210abd43d605373b663"
+      "COMPLETE \u2014 supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21",
+      "COMPLETE \u2014 out-of-band HMAC signer and operational V2 agents merged as 025492456d4e3ca8363d7210abd43d605373b663"
     ],
     "NEXT": [
-      "Add an independently administered external anchor (WORM remains later)",
-      "Add browser-executed DOM security coverage"
+      "COMPLETE \u2014 bounded operational V2 foundation (PR #18)",
+      "COMPLETE \u2014 HMAC signing moved out of the orchestrator (PR #18 / issue #4)",
+      "THIS INCREMENT \u2014 Layer-1 overlap deny, squash-merge CI, DOM fixture inventory"
     ],
     "LATER": [
-      "Independently administered WORM evidence store",
-      "Supported continuous V2 product (explicitly not this release)"
+      "Independently administered WORM evidence store (issue #23)",
+      "Playwright execution of the DOM fixture inventory against a live console (issue #24)"
     ],
     "DEFERRED": [
       "Unattended continuous service",
@@ -179,20 +191,26 @@
     {
       "item": "Release verification",
       "state": "closed",
-      "impact": "none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed",
+      "impact": "none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed for NOW",
       "owner": "completed"
     },
     {
       "item": "Out-of-band signer",
-      "state": "merged on PR #18",
-      "impact": "Unix-socket signer landed; independently administered WORM remains later",
+      "state": "closed",
+      "impact": "Unix-socket signer landed in PR #18; independently administered WORM remains later",
       "owner": "PR #18"
     },
     {
       "item": "Operational V2 lifecycle",
-      "state": "landed experimental",
+      "state": "closed as experimental",
       "impact": "continuous mode remains experimental and unsupported",
       "owner": "PR #18"
+    },
+    {
+      "item": "Layer-1 overlap deny and squash-merge CI",
+      "state": "this increment",
+      "impact": "parent CIDR cannot scan a /32 carve-out; control-docs topology accepts one-parent squash-merges",
+      "owner": "feat/finish-v1-rc-closeout"
     }
   ],
   "architecture": [
@@ -241,7 +259,11 @@
     "PR #18 CI fix: Bandit B108 closed by user-private signer socket default",
     "PR #18 CI fix: cryptography 50.0.0 hash-locked for PYSEC-2026-3552",
     "315-test hash-locked Python 3.12 suite passed locally after the CI fixes",
-    "PR #18 merged to main as 025492456d4e3ca8363d7210abd43d605373b663"
+    "PR #18 merged to main as 025492456d4e3ca8363d7210abd43d605373b663",
+    "Layer-1 deny matching uses overlaps() so a parent CIDR cannot scan a /32 carve-out",
+    "Packed integer/hex tokens that are not IPv4 deny instead of crashing",
+    "Control-docs CI accepts one-parent squash-merges onto main",
+    "DOM fixture inventory and static-console textContent contract landed"
   ],
   "control_links": [
     {

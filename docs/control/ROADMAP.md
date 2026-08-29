@@ -58,10 +58,12 @@ gate and evidence are satisfied.
   repeated cycles are idempotent; no continuous loop is enabled by default.
 - **Evidence:** approved design, executable tests, committed implementation,
   green PR CI/CodeQL, operator runbook.
-- **Owner:** unassigned until separately authorized.
-- **Current state:** queued, not started.
-- **Re-entry condition:** start only from the merged `NOW` main SHA with a fresh
-  branch and explicit authorization.
+- **Owner:** Georgi Gaydarov; implementation in PR #18.
+- **Current state:** complete. PR #18 squash-merged as
+  `025492456d4e3ca8363d7210abd43d605373b663`. Continuous mode remains
+  experimental and unsupported.
+- **Re-entry condition:** a supported continuous CLI command requires a
+  separate increment after independently administered WORM storage.
 
 ## NEXT — Out-of-band audit signer
 
@@ -81,9 +83,31 @@ gate and evidence are satisfied.
 - **Binary exit gate:** tool runner process and child environments contain no
   signing key while every audit operation remains fail closed and verifiable.
 - **Evidence:** issue #4 closure PR, test report, operations and rollback proof.
-- **Owner:** unassigned until separately authorized.
-- **Current state:** open issue; not a blocker for supervised isolated V1.
-- **Re-entry condition:** separately approved security increment.
+- **Owner:** Georgi Gaydarov; implementation in PR #18.
+- **Current state:** complete. `argus signer` is the only process that reads
+  `PENTEST_AUDIT_HMAC_KEY` when `ARGUS_SIGNER_SOCKET` is set. In-process
+  signing remains the isolated-lab default.
+- **Re-entry condition:** independently administered WORM storage is a
+  separate LATER increment.
+
+## NEXT — Scope overlap deny and squash-merge CI
+
+- **Objective:** close the Layer-1 parent-CIDR carve-out bypass and restore
+  `main` CI after the PR #18 squash-merge.
+- **Included scope:** deny matching by `overlaps()`; refuse packed integers
+  that are not IPv4; accept one-parent squash-merge topology in control-docs
+  CI; refresh the generated dashboard so it no longer claims PR #18 is open.
+- **Exclusions:** unattended mode, WORM, Playwright wiring, live scans.
+- **Security boundary:** no scope, tool, approval, or sandbox weakening.
+- **Verification commands:** `tests/test_guardrail.py`,
+  `tests/test_control_docs.py`, `tests/test_dom_suite.py`, dashboard
+  generation.
+- **Binary exit gate:** `172.30.0.0/24` is refused when `172.30.0.50/32` is
+  denied; oversized packed integers deny rather than crash; squash-merge
+  topology tests pass; generated dashboard matches STATUS.json.
+- **Owner:** Georgi Gaydarov.
+- **Current state:** this increment.
+- **Re-entry condition:** merge this branch; close PR #19 / #21 as superseded.
 
 ## LATER — Independently administered external anchor
 
@@ -119,9 +143,12 @@ gate and evidence are satisfied.
 - **Binary exit gate:** malicious fixtures execute no script and render only as
   text in a real browser.
 - **Evidence:** trace/screenshots and CI test results.
-- **Owner:** unassigned.
-- **Current state:** later, non-blocking for current release.
-- **Re-entry condition:** begin in the next UI-focused increment.
+- **Owner:** Georgi Gaydarov.
+- **Current state:** fixture inventory and static-console contract landed in
+  this increment (`aegis/tests/test_dom_suite.py`). Playwright execution
+  against a live page remains the remaining gate.
+- **Re-entry condition:** add Playwright to CI without weakening localhost or
+  live-mode boundaries.
 
 ## DEFERRED — Unattended continuous service
 

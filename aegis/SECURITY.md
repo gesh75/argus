@@ -50,8 +50,10 @@ production, unattended, or network-exposed deployment. This document is the cont
 - Audit and optional anchor parents must be pre-provisioned, owned by the Argus uid,
   and not group/world writable; final files are owner-only `0600`.
 - The local JSON anchor is a consistency check, not an external WORM control.
-- The orchestrator process still holds the HMAC key. Child tool environments are scrubbed,
-  but issue #4's out-of-band signer remains required for a stronger trust boundary.
+- When `ARGUS_SIGNER_SOCKET` is set, the orchestrator never loads the HMAC key;
+  `argus signer` is the only process that reads it (PR #18 / issue #4). In-process
+  signing remains the isolated-lab default. Independently administered WORM storage
+  for the key and chain tip remains LATER.
 - A Phase 1 writer cannot verify V2 signatures and must never open a log containing V2.
 - See `docs/PHASE2A_AUDIT_OPERATIONS.md` for deployment, recovery, and rollback.
 

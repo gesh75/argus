@@ -1,5 +1,35 @@
 # Argus Engineering Change Log
 
+## 2026-08-29 — PR #18 recorded; scope overlap deny; DOM fixtures
+
+### Added
+
+- Deny-by-overlap for Layer-1 scope so a parent CIDR cannot scan a more-specific
+  carve-out (clinical `172.30.0.50/32` inside lab `172.30.0.0/24`).
+- Packed integer/hex tokens that do not fit in IPv4 fail closed instead of
+  becoming IPv6.
+- Squash-merge topology coverage in control-docs CI (one-parent `main` pushes).
+- Browser DOM fixture inventory and static-console contract tests.
+
+### Changed
+
+- Control dashboard, roadmap, and STATUS.json record PR #18 as merged.
+  Out-of-band HMAC signer and bounded V2 foundation are no longer "in review".
+- Issue #4 is closed by PR #18; independently administered WORM remains LATER.
+- README and package README test badges updated to the PR #18 collection (315).
+
+### Preserved
+
+- Scope, tool firewall, argument, budget, time, approval, sandbox, audit,
+  redirect, request-size, localhost, and server-controlled live-mode values.
+- Continuous mode remains experimental and unsupported.
+- Local JSON anchor is still not WORM. No live scan or deployment.
+
+### Explicitly not changed
+
+- No Playwright CI job yet. Fixture inventory is the start of that gate.
+- No unattended scheduler, production claim, or multi-user service.
+
 ## 2026-07-30 — Argus 1.0 supervised RC closeout
 
 Delivered by [PR #17](https://github.com/gesh75/argus/pull/17), merged as

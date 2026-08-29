@@ -1,5 +1,18 @@
 # Argus Release Closeout Agent Handoff
 
+## 2026-08-29 increment
+
+- Repository: `gesh75/argus`.
+- Starting `origin/main`: `025492456d4e3ca8363d7210abd43d605373b663`
+  (PR #18 squash-merge).
+- Active branch: `feat/control-refresh-dom-and-scope`.
+- This increment does not rewrite historical closeout evidence below.
+- Work: record PR #18 on the dashboard; restore squash-merge CI; land
+  Layer-1 overlap deny; start the DOM fixture inventory.
+- Safety: no live scan, no deployment, no unattended mode, no WORM claim.
+- Next after merge: Playwright DOM execution; independently administered
+  WORM; close issue #4 and supersede draft PRs #19/#20/#21.
+
 ## Authority and ownership
 
 - Sole implementation owner: this Codex session.
