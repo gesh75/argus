@@ -46,10 +46,12 @@ as an artifact, and the `pip-audit` job is **blocking** against the locked tree 
 ## P1 — Audit-integrity & authorization, to best-of-breed
 
 ### 🔭 4. Move the HMAC signing key out-of-band from the tool runner
-The merged child-environment fix stopped the key leaking into tool subprocesses, but the
-**orchestrator process still holds the key** while it coordinates collectors. The remaining
-work is a separately authenticated out-of-band signer with explicit availability, failure,
-recovery, operations, and rollback semantics. It is tracked in GitHub issue #4.
+The merged child-environment fix stopped the key leaking into tool subprocesses.
+PR #18 landed the remaining process isolation: `argus signer --socket PATH` holds
+the key; the orchestrator connects via `ARGUS_SIGNER_SOCKET` and never loads
+`PENTEST_AUDIT_HMAC_KEY`. Signer unavailability is fail-closed. In-process
+signing remains the default when the socket env is unset (supervised isolated-lab
+compatibility). GitHub issue #4 is closed by that increment.
 
 **✅ Short-term landed:** `AuditLog` now **fails closed on a weak audit key** (`MIN_AUDIT_KEY_LEN
 = 32`) — a placeholder/short key can no longer sign a "tamper-evident" chain (`guardrail.py`).
@@ -57,7 +59,7 @@ recovery, operations, and rollback semantics. It is tracked in GitHub issue #4.
 connects via `ARGUS_SIGNER_SOCKET` and never loads `PENTEST_AUDIT_HMAC_KEY`. Signer
 unavailability is fail-closed. In-process signing remains the default when the socket env
 is unset (supervised isolated-lab compatibility).
-**Remaining:** independently administered WORM storage for the key and the chain tip. The signer process is landed (`argus signer --socket`); peer-uid and bounded messages are in place.
+**Remaining:** independently administered WORM storage for the key and the chain tip.
 
 > *Best practice:* "the agent never touches the signing keys" (ROE Gate, reference-monitor /
 > Anderson 1972); "the key sits outside the log volume so an attacker who can write the log
@@ -130,8 +132,10 @@ enabled — so a human catches the misconfiguration at setup time rather than af
 
 ## Suggested sequencing (remaining)
 
-Use the binary gates in `docs/control/ROADMAP.md`: close the supervised V1 release candidate,
-then separately design the out-of-band signer and a bounded operational V2 foundation. An
-independently administered external anchor remains a later higher-trust deployment gate.
+Use the binary gates in `docs/control/ROADMAP.md`: `NOW` (supervised V1) and the
+PR #18 signer/V2-foundation `NEXT` items are complete. Remaining `NEXT` work is
+the browser-executed DOM suite and independently administered WORM. An
+independently administered external anchor remains a later higher-trust
+deployment gate.
 
 _Tracking issues are linked from each 🔭 item once opened._

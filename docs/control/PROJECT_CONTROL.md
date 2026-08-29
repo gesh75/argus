@@ -7,14 +7,15 @@
 | Repository | `gesh75/argus` |
 | Canonical local path | `/Users/georgigaydarov/Projects/ecp-aegis-lab` |
 | Release merge on remote `main` | `b75af239c441204699114ce34970e37b394b3c21` |
-| Delivered branch | `fix/argus-release-closeout` at `8f1fed7d88c821f926c332ea691f151c58d73dbd` |
-| Pull request | [#17](https://github.com/gesh75/argus/pull/17), merged |
+| Current `main` | `025492456d4e3ca8363d7210abd43d605373b663` (PR #18 squash-merge) |
+| Delivered branch | `feat/control-refresh-dom-and-scope` |
+| Pull request | this increment; records PR #18, lands overlap deny, starts DOM suite |
 | Branch source snapshot | Recorded in [`STATUS.json`](STATUS.json) |
 | Worktree | One canonical writer; competing work preserved per [`AGENT_HANDOFF.md`](AGENT_HANDOFF.md) |
-| Lifecycle | Release closeout |
+| Lifecycle | Post-#18 control refresh and Layer-1 overlap fix |
 | Maturity | Release candidate for supervised defensive assessment; alpha runtime maturity |
 | Release target | Argus 1.0 supervised defensive assessment release candidate |
-| Active phase | `NOW` complete — Path A closeout delivered |
+| Active phase | `NEXT` — scope overlap deny, squash-merge CI, DOM fixture inventory |
 | Last verified | Recorded in [`STATUS.json`](STATUS.json) |
 
 ## Supported boundary
@@ -32,6 +33,9 @@ Supported:
   parameter-bound approval token and remains an operator-controlled exception.
 - Transactional V1/V2 audit replay, V2 append, local anchor consistency, and
   read-only diagnostics under the Phase 2A POSIX assumptions.
+- Out-of-band HMAC signer via `argus signer` (PR #18). In-process remains the
+  isolated-lab default when `ARGUS_SIGNER_SOCKET` is unset.
+- Experimental V2 proposal→collect→persist path. No supported continuous CLI.
 
 Unsupported:
 
@@ -97,29 +101,30 @@ gate for a future V2 foundation.
 - Release-closeout worktree reconciliation and evidence preservation.
 - Explicit experimental gate and warnings for V2 continuous mode.
 - Canonical control pack and deterministic dashboard.
-- PR #17 merged with head-SHA protection as
-  `b75af239c441204699114ce34970e37b394b3c21`; its one independent read-only
-  review was resolved and post-merge CI/CodeQL passed.
+- PR #18 squash-merged as `025492456d4e3ca8363d7210abd43d605373b663`:
+  Unix-socket HMAC signer and bounded operational V2 agents.
+- Layer-1 overlap deny and packed-integer IPv4 refusal (this increment).
+- DOM fixture inventory and static-console contract (this increment).
 
 ## Priority gaps
 
 ### P0
 
 No unresolved P0 blocker exists for the supervised V1 release candidate.
-Every required release and post-merge gate passed.
+`main` CI is red after the PR #18 squash-merge because control-docs topology
+required a two-parent merge. This increment restores one-parent squash
+acceptance.
 
 ### P1
 
-- GitHub issue #4: Unix-socket signer landed (`argus signer`); independently
-  administered WORM storage for the key and chain tip remains.
 - Independently administered external/WORM anchoring before any higher-trust
-  deployment claim.
+  deployment claim. Issue #4 (signer process) is closed by PR #18.
 - Keep V2 continuous mode experimental until a supported CLI contract exists.
 
 ### P2
 
-- Browser-executed DOM security test in addition to current source and ASGI
-  coverage.
+- Playwright execution of the DOM fixture inventory against a live localhost
+  console. Source/ASGI/static contract tests are in this increment.
 - CI package-build and wheel-install smoke gate.
 - Event-level audit idempotency for uncertain commit recovery.
 - Cross-platform audit-writer design if Windows controller support is required.
@@ -127,22 +132,16 @@ Every required release and post-merge gate passed.
 ## Repository and security state
 
 - Release pull request: PR #17, merged.
-- Open issues at baseline: issue #4 only.
-- Open CodeQL alerts after merge: none.
-- Baseline main CI, CodeQL, Copilot setup, and Pages runs passed at
-  `79cb27269333a34ae6dac42897f9b15e99e4f667`.
-- Local Python 3.12 hash-locked baseline: 279 collected, 279 passed.
-- Final release-closeout evidence is recorded in [`STATUS.json`](STATUS.json)
+- Signer / V2 foundation: PR #18, squash-merged.
+- Open issues at start of this increment: issue #4 only (closes with this PR).
+- Open CodeQL alerts after PR #18: none (CodeQL run 32844334313 passed).
+- `main` CI after PR #18: failed (run 32844334226) on squash-merge topology.
+- Local Python 3.12 hash-locked collection recorded in STATUS.json: 315.
+- Final evidence is recorded in [`STATUS.json`](STATUS.json)
   and [`CHANGELOG.md`](CHANGELOG.md).
-- Post-merge CI:
-  [run 30523751828](https://github.com/gesh75/argus/actions/runs/30523751828),
-  passed.
-- Post-merge CodeQL:
-  [run 30523751784](https://github.com/gesh75/argus/actions/runs/30523751784),
-  passed.
 
 ## Next exact action
 
-No additional repository action is authorized. `NOW` is complete. Begin a
-`NEXT` item only from current `main`, on a fresh branch, after separate
-authorization.
+Land this branch. Close issue #4. Supercede draft PRs #19, #20, and #21.
+Do not enable unattended continuous mode or weaken scope, approval, or
+sandbox boundaries. Playwright DOM execution is the next UI-focused gate.

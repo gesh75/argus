@@ -72,6 +72,42 @@ def test_denied_carveout_inside_allowed_is_rejected(guard):
     assert guard.check_target("172.30.0.10").allowed         # rest of lab still in scope
 
 
+def test_parent_cidr_covering_denied_carveout_is_rejected(guard):
+    """A /24 scan must not authorize traffic to a /32 deny inside that /24.
+
+    172.30.0.0/24 is not a subnet of 172.30.0.50/32, so a subnet_of deny-check
+    would authorize nmap of the whole lab — including the carved-out host.
+    """
+    import ipaddress
+    object.__setattr__(guard.policy, "denied_networks",
+                       guard.policy.denied_networks + (ipaddress.ip_network("172.30.0.50/32"),))
+    assert not guard.check_target("172.30.0.0/24").allowed
+    assert not guard.check_target("172.30.0.0/25").allowed   # .50 is in 0-127
+    assert guard.check_target("172.30.0.128/25").allowed     # does not contain .50
+    with pytest.raises(GuardrailError):
+        guard.authorize("nmap", ["nmap", "-sT", "172.30.0.0/24"], ["172.30.0.0/24"])
+
+
+def test_allowed_lab_cidr_is_still_in_scope(guard):
+    # Default policy: allow 172.30.0.0/24, deny includes 172.16.0.0/12 and 0.0.0.0/0.
+    # The more-specific lab allow must still win for the range itself.
+    assert guard.check_target("172.30.0.0/24").allowed
+
+
+def test_oversized_integer_is_rejected_as_ipv4():
+    # 2**32 is a valid ipaddress int but becomes IPv6 (::1:0:0), not a packed IPv4.
+    with pytest.raises(ValueError, match="IPv4"):
+        canon_network("4294967296")
+    with pytest.raises(ValueError, match="IPv4"):
+        canon_network("0x100000000")
+
+
+def test_oversized_integer_target_is_denied_not_crash(guard):
+    decision = guard.check_target("4294967296")
+    assert not decision.allowed
+    assert decision.layer == "scope"
+
+
 # ---- authorize(): hostnames, file inputs, NSE, metachars all fail closed ---
 def test_hostname_arg_denied(guard):
     with pytest.raises(GuardrailError):

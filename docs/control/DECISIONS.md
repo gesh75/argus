@@ -72,6 +72,33 @@
 - **Consequences:** release documentation states “not deployed”; a future
   operator deployment requires the runbook and independent authorization.
 
+## ADR-008 — Out-of-band signer landed; WORM remains later
+
+- **Status:** accepted and delivered
+- **Decision:** PR #18 implements `UnixSocketSigner` / `argus signer`. When
+  `ARGUS_SIGNER_SOCKET` is set the orchestrator never loads
+  `PENTEST_AUDIT_HMAC_KEY`. In-process signing remains the isolated-lab
+  default. Independently administered WORM storage is a separate LATER gate.
+- **Rationale:** issue #4 asked for the key out of the tool-runner process.
+  That process isolation is now code. Claiming WORM would overstate the local
+  JSON anchor, which still shares the controller trust domain (ADR-003).
+- **Consequences:** issue #4 closes. ADR-004's residual ("orchestrator still
+  holds the HMAC key") no longer applies when the socket env is set. Local
+  JSON is still not WORM.
+
+## ADR-009 — Deny matching uses overlap, not subnet_of
+
+- **Status:** accepted
+- **Decision:** Layer-1 denied networks match with `IPv4Network.overlaps()`.
+  Longest-prefix-match still lets a lab `/24` allow override a broad `/12`
+  deny, while a `/32` carve-out inside that `/24` refuses the parent CIDR.
+- **Rationale:** `172.30.0.0/24` is not a subnet of `172.30.0.50/32`, so
+  `subnet_of` authorized an nmap of the whole lab including the excluded
+  host. Firewall semantics are overlap, not containment of the request
+  inside the deny.
+- **Consequences:** `aegis scan 172.30.0.0/24` is refused when the clinical
+  `/32` is denied. Packed integers `>= 2**32` are refused as non-IPv4.
+
 ## ADR-007 — Close `NOW` at the reviewed merge
 
 - **Status:** accepted and delivered

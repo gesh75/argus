@@ -9,14 +9,14 @@
 
 > **Run supervised defensive assessments inside an explicitly authorized, separately verified lab.** Argus turns bounded read-only collection into proof-annotated findings behind a fail-closed guardrail.
 
-![tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-3776ab)
 ![posture](https://img.shields.io/badge/posture-read--only%20%C2%B7%20fail--closed-2ea44f)
 ![audit](https://img.shields.io/badge/audit-HMAC%20chained-8a5cf6)
 ![ai](https://img.shields.io/badge/AI-Claude%20%C2%B7%20Ollama%20%C2%B7%20offline-e3b341)
 ![scope](https://img.shields.io/badge/scope-network%20%C2%B7%20host%20%C2%B7%20AD%20%C2%B7%20web-1f6feb)
 
-Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus V1 is built around a deterministic guardrail and sandboxed collectors.** V2 agent, continuous, and evidence-graph modules are experimental scaffolding and are not a production continuous service.
+Most "AI pentest" tools are a scanner with a chatbot bolted on: they run a linear checklist and summarize it. **Argus V1 is built around a deterministic guardrail and sandboxed collectors.** V2 agent, continuous, and evidence-graph modules are experimental and operator-gated. They are not a production continuous service. When `ARGUS_SIGNER_SOCKET` is set, HMAC signing happens in a separate `argus signer` process that never shares the key with the orchestrator.
 
 > **Maturity: supervised release candidate; alpha runtime.** V1 is the supported product. V2 continuous mode is experimental, explicitly gated, and unsupported. Argus is not approved for unattended, network-exposed, multi-user, production, regulated, or 24/7 deployment. The web console is localhost-only and live web execution is disabled by default.
 
@@ -156,7 +156,8 @@ LAN_GW=192.168.1.1 ../scripts/verify-isolation.sh    # verify isolation FIRST
 
 ## Tests
 
-Current release-closeout collection: **292 tests** on Python 3.12. Historical counts in the build log and phase delivery reports remain labeled snapshots.
+Current collection: **315 tests** on Python 3.12 (PR #18). The 292-test
+release-closeout total remains a labeled historical snapshot.
 
 ```bash
 cd aegis && PENTEST_AUDIT_HMAC_KEY=$(openssl rand -hex 32) python -m pytest -q
