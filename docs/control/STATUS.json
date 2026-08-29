@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-23T02:13:45Z",
+  "generated_at": "2026-08-29T07:45:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
-  "current_main_sha": "bb0734f0ab950d48ca25fd078e9e9b4c01a90043",
-  "active_branch": "feat/oob-signer-and-v2-agents",
-  "head_sha": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5",
+  "current_main_sha": "025492456d4e3ca8363d7210abd43d605373b663",
+  "active_branch": "main",
+  "head_sha": "025492456d4e3ca8363d7210abd43d605373b663",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5",
+  "source_commit": "025492456d4e3ca8363d7210abd43d605373b663",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
-  "maturity": "NOW complete; supervised defensive assessment release candidate; alpha runtime",
+  "maturity": "NOW complete; PR #18 on main; supervised defensive assessment release candidate; alpha runtime",
   "supported_deployment_modes": [
     "supervised, explicitly authorized isolated-lab assessment",
     "Python 3.12+ POSIX macOS/Linux controller",
@@ -101,21 +101,13 @@
     "release_closeout_run": "https://github.com/gesh75/argus/actions/runs/30523639583",
     "post_merge_run": "https://github.com/gesh75/argus/actions/runs/30523751784"
   },
-  "open_pull_requests": [
-    {
-      "number": 18,
-      "title": "feat: out-of-band HMAC signer and operational V2 agent proposals",
-      "url": "https://github.com/gesh75/argus/pull/18",
-      "head_sha": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5",
-      "branch": "feat/oob-signer-and-v2-agents"
-    }
-  ],
+  "open_pull_requests": [],
   "merged_pull_request": {
-    "number": 17,
-    "title": "fix: close Argus supervised release boundary",
-    "url": "https://github.com/gesh75/argus/pull/17",
-    "head_sha": "8f1fed7d88c821f926c332ea691f151c58d73dbd",
-    "merge_sha": "b75af239c441204699114ce34970e37b394b3c21"
+    "number": 18,
+    "title": "feat: out-of-band HMAC signer and operational V2 agent proposals",
+    "url": "https://github.com/gesh75/argus/pull/18",
+    "head_sha": "025492456d4e3ca8363d7210abd43d605373b663",
+    "merge_sha": "025492456d4e3ca8363d7210abd43d605373b663"
   },
   "open_issues": [
     {
@@ -126,12 +118,12 @@
     }
   ],
   "blockers": [],
-  "next_action": "Land PR #18 after pytest, Bandit, and pip-audit are green. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
+  "next_action": "PR #18 is on main. Do not enable unattended continuous mode. Do not weaken scope, approval, or sandbox boundaries. Independently administered WORM remains later.",
   "documentation_freshness": {
-    "status": "PR #18 source snapshot",
+    "status": "PR #18 merged snapshot",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "4f82462a8aba7500a30ca1b686fee48d7a9e93f5"
+    "source_commit": "025492456d4e3ca8363d7210abd43d605373b663"
   },
   "completed_milestones": [
     {
@@ -158,19 +150,25 @@
       "name": "Release-closeout recovery and V2 isolation",
       "evidence": "PR #17; merge b75af239c441204699114ce34970e37b394b3c21",
       "state": "merged; post-merge CI and CodeQL passed"
+    },
+    {
+      "name": "Out-of-band HMAC signer and operational V2 agents",
+      "evidence": "PR #18; merge 025492456d4e3ca8363d7210abd43d605373b663",
+      "state": "merged"
     }
   ],
   "roadmap": {
     "NOW": [
-      "COMPLETE \u2014 supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21"
+      "COMPLETE \u2014 supervised V1 release closeout merged as b75af239c441204699114ce34970e37b394b3c21",
+      "COMPLETE \u2014 out-of-band HMAC signer and operational V2 agents merged as 025492456d4e3ca8363d7210abd43d605373b663"
     ],
     "NEXT": [
-      "Complete one bounded operational V2 foundation (in review on PR #18)",
-      "Move HMAC signing out of the orchestrator (in review on PR #18)"
+      "Add an independently administered external anchor (WORM remains later)",
+      "Add browser-executed DOM security coverage"
     ],
     "LATER": [
-      "Add an independently administered external anchor",
-      "Add browser-executed DOM security coverage"
+      "Independently administered WORM evidence store",
+      "Supported continuous V2 product (explicitly not this release)"
     ],
     "DEFERRED": [
       "Unattended continuous service",
@@ -182,17 +180,17 @@
       "item": "Release verification",
       "state": "closed",
       "impact": "none; all local, PR, review, merge, post-merge CI, and CodeQL gates passed",
-      "owner": "completed by sole implementation session"
+      "owner": "completed"
     },
     {
       "item": "Out-of-band signer",
-      "state": "in review on PR #18",
+      "state": "merged on PR #18",
       "impact": "Unix-socket signer landed; independently administered WORM remains later",
       "owner": "PR #18"
     },
     {
       "item": "Operational V2 lifecycle",
-      "state": "in review on PR #18",
+      "state": "landed experimental",
       "impact": "continuous mode remains experimental and unsupported",
       "owner": "PR #18"
     }
@@ -242,7 +240,8 @@
     "exactly one independent read-only review completed; all three findings were resolved before merge",
     "PR #18 CI fix: Bandit B108 closed by user-private signer socket default",
     "PR #18 CI fix: cryptography 50.0.0 hash-locked for PYSEC-2026-3552",
-    "315-test hash-locked Python 3.12 suite passed locally after the CI fixes"
+    "315-test hash-locked Python 3.12 suite passed locally after the CI fixes",
+    "PR #18 merged to main as 025492456d4e3ca8363d7210abd43d605373b663"
   ],
   "control_links": [
     {
