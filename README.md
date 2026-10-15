@@ -1,4 +1,4 @@
-<p align="center"><img src="aegis/docs/assets/hero.svg" alt="Argus — agentic AI penetration testing" width="100%"></p>
+<p align="center"><img src="aegis/docs/assets/hero.svg" alt="Argus — supervised, fail-closed defensive security assessment" width="100%"></p>
 
 <p align="center">
   <a href="https://gesh75.github.io/argus/"><img src="docs/assets/preview.png" alt="Argus — live documentation" width="100%"></a>
