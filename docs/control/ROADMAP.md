@@ -106,8 +106,10 @@ gate and evidence are satisfied.
   denied; oversized packed integers deny rather than crash; squash-merge
   topology tests pass; generated dashboard matches STATUS.json.
 - **Owner:** Georgi Gaydarov.
-- **Current state:** this increment.
-- **Re-entry condition:** merge this branch; close PR #19 / #21 as superseded.
+- **Current state:** complete. PR #26 squash-merged as
+  `567bffb3cb2253eb7beecbdf318824abdc8981b0`.
+- **Re-entry condition:** any regression in scope overlap deny or control-docs
+  topology reopens this increment.
 
 ## LATER — Independently administered external anchor
 
@@ -144,11 +146,11 @@ gate and evidence are satisfied.
   text in a real browser.
 - **Evidence:** trace/screenshots and CI test results.
 - **Owner:** Georgi Gaydarov.
-- **Current state:** fixture inventory and static-console contract landed in
-  this increment (`aegis/tests/test_dom_suite.py`). Playwright execution
-  against a live page remains the remaining gate.
-- **Re-entry condition:** add Playwright to CI without weakening localhost or
-  live-mode boundaries.
+- **Current state:** complete. Playwright execution against live FastAPI
+  localhost console landed in `aegis/tests/test_dom_suite.py` with zero script
+  execution, strict CSP, and localhost-boundary verification; issue #24 closed.
+- **Re-entry condition:** any failure of the DOM fixture inventory or live
+  browser assertions reopens this increment.
 
 ## DEFERRED — Unattended continuous service
 
