@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-10T03:00:00Z",
+  "generated_at": "2026-11-10T03:05:00Z",
   "repository": "gesh75/argus",
   "release_merge_sha": "b75af239c441204699114ce34970e37b394b3c21",
   "current_main_sha": "4bcd4d2c3575a4ce5d85cc49e0c594fd46f2f07f",
   "active_branch": "cursor/fix-main-ci-6a4d",
-  "head_sha": "4ce4cb2ad53c501449838996dcee8f9294cc7847",
+  "head_sha": "d5b14cf37572f757b99b7b9f4c73078da0b77a37",
   "head_sha_semantics": "repository HEAD when the snapshot inputs were frozen; the generated snapshot is carried by the following Git commit",
-  "source_commit": "4ce4cb2ad53c501449838996dcee8f9294cc7847",
+  "source_commit": "d5b14cf37572f757b99b7b9f4c73078da0b77a37",
   "dirty": false,
   "release_target": "Argus 1.0 supervised defensive assessment release candidate",
   "maturity": "NOW complete; PR #18 and #26 on main; Playwright DOM suite verified; supervised defensive assessment release candidate; alpha runtime",
@@ -58,7 +58,7 @@
       "skipped": 1,
       "python": "3.12.3",
       "dependency_source": "aegis/requirements.lock --require-hashes",
-      "note": "Playwright live-console test skipped without Playwright/Chromium; static DOM contract tests collected"
+      "note": "Playwright live-console test uses pytest.importorskip; static DOM contract tests collected"
     }
   },
   "lint_results": {
@@ -129,10 +129,10 @@
   "blockers": [],
   "next_action": "Supervised V1 RC is complete. Independently administered WORM (issue #23) remains LATER. Playwright DOM security suite landed (issue #24 closed). Main CI pytest collection and pip-audit pins are on cursor/fix-main-ci-6a4d. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.",
   "documentation_freshness": {
-    "status": "Main CI pytest/pip-audit fix snapshot; source_commit is 4ce4cb2ad53c501449838996dcee8f9294cc7847",
+    "status": "Main CI pytest/pip-audit fix snapshot; source_commit is d5b14cf37572f757b99b7b9f4c73078da0b77a37",
     "generator": "scripts/generate_control_dashboard.py",
     "dashboard": "docs/index.html",
-    "source_commit": "4ce4cb2ad53c501449838996dcee8f9294cc7847"
+    "source_commit": "d5b14cf37572f757b99b7b9f4c73078da0b77a37"
   },
   "completed_milestones": [
     {
@@ -274,7 +274,7 @@
     "DOM fixture inventory and static-console textContent contract landed",
     "PR #26 squash-merged to main as 567bffb3cb2253eb7beecbdf318824abdc8981b0",
     "Playwright execution against live localhost console verified zero script execution, strict CSP, and safe text rendering across all 6 DOM fixtures (issue #24 closed)",
-    "Main CI restored: Playwright import optional at collection time; anyio 4.14.2, certifi 2026.10.23, urllib3 2.8.0 hash-locked for PYSEC-2026-4023/4024/4025, PYSEC-2026-4320, PYSEC-2026-4175/4176/4177"
+    "Main CI restored: live DOM test uses pytest.importorskip; anyio 4.14.2, certifi 2026.10.23, urllib3 2.8.0 hash-locked for PYSEC-2026-4023/4024/4025, PYSEC-2026-4320, PYSEC-2026-4175/4176/4177"
   ],
   "control_links": [
     {
