@@ -18,7 +18,13 @@ from pathlib import Path
 
 import pytest
 import uvicorn
-from playwright.sync_api import sync_playwright
+
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    # Optional: the live-console gate skips when Playwright is not installed.
+    # Static fixture/contract tests in this module must still collect on CI.
+    sync_playwright = None
 
 from aegis.web import _CSP, app
 
@@ -101,6 +107,8 @@ def test_static_console_does_not_embed_malicious_fixtures() -> None:
 
 
 def test_playwright_live_console_executes_no_malicious_fixtures() -> None:
+    if sync_playwright is None:
+        pytest.skip("Playwright is not installed")
     chromium_path = shutil.which("chromium") or shutil.which("chromium-browser")
     if not chromium_path:
         pytest.skip("Chromium browser not found on host")
