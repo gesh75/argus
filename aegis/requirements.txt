@@ -11,6 +11,12 @@ anthropic>=0.40.0
 pywinrm>=0.4.3
 # Transitive via pywinrm/pyspnego. Pin for PYSEC-2026-3552 (PKCS#7 CEK oracle).
 cryptography>=50.0.0
+# Transitive via httpx/starlette. Pin for PYSEC-2026-4023/4024/4025.
+anyio>=4.14.2
+# Transitive via httpx/requests. Pin for PYSEC-2026-4320 (compromised emSign roots).
+certifi>=2026.10.19
+# Transitive via requests. Pin for PYSEC-2026-4175/4176/4177.
+urllib3>=2.8.0
 # Web GUI
 fastapi>=0.110
 uvicorn[standard]>=0.29
