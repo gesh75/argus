@@ -263,7 +263,7 @@
       <div class="status-grid">
         <article class="status-card"><span>Repository</span><strong>gesh75/argus</strong><span class="badge warn">tracked</span></article>
         <article class="status-card"><span>Release target</span><strong>Argus 1.0 supervised defensive assessment release candidate</strong><span class="badge warn">in progress</span></article>
-        <article class="status-card"><span>Branch</span><strong>main</strong><span class="badge warn">canonical</span></article>
+        <article class="status-card"><span>Branch</span><strong>cursor/fix-main-ci-6a4d</strong><span class="badge warn">canonical</span></article>
         <article class="status-card"><span>Open PRs</span><strong>0</strong><span class="badge warn">clear</span></article>
         <article class="status-card"><span>Open issues</span><strong>1</strong><span class="badge warn">tracked</span></article>
         <article class="status-card"><span>Release blockers</span><strong>0</strong><span class="badge warn">clear</span></article>
@@ -276,9 +276,9 @@
         <p>Exact immutable identifiers and the current security-analysis state.</p>
       </div>
       <div class="status-grid">
-        <article class="status-card"><span>Current main</span><strong><code>5f1321c47f1a05f6f09dfafd86daad27d8e06b9c</code></strong></article>
-        <article class="status-card"><span>Generation HEAD</span><strong><code>5f1321c47f1a05f6f09dfafd86daad27d8e06b9c</code></strong></article>
-        <article class="status-card"><span>Source commit</span><strong><code>5f1321c47f1a05f6f09dfafd86daad27d8e06b9c</code></strong></article>
+        <article class="status-card"><span>Current main</span><strong><code>4bcd4d2c3575a4ce5d85cc49e0c594fd46f2f07f</code></strong></article>
+        <article class="status-card"><span>Generation HEAD</span><strong><code>4ce4cb2ad53c501449838996dcee8f9294cc7847</code></strong></article>
+        <article class="status-card"><span>Source commit</span><strong><code>4ce4cb2ad53c501449838996dcee8f9294cc7847</code></strong></article>
         <article class="status-card"><span>CodeQL</span><strong>passed</strong><span class="badge ok">passed</span></article>
       </div>
     </section>
@@ -327,7 +327,7 @@
         <div><div class="eyebrow">Operator queue</div><h2>Next exact action</h2></div>
         <p>One executable action owns the NOW gate.</p>
       </div>
-      <div class="next-action">Supervised V1 RC is complete. Independently administered WORM (issue #23) remains LATER. Playwright DOM security suite landed (issue #24 closed). Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.</div>
+      <div class="next-action">Supervised V1 RC is complete. Independently administered WORM (issue #23) remains LATER. Playwright DOM security suite landed (issue #24 closed). Main CI pytest collection and pip-audit pins are on cursor/fix-main-ci-6a4d. Do not enable unattended continuous mode or weaken scope, approval, or sandbox boundaries.</div>
     </section>
 
     <section id="architecture">
@@ -355,7 +355,7 @@
         <p>Local and GitHub gates are visible without converting pending work into a claim.</p>
       </div>
       <div class="evidence-grid"><article class="evidence-card"><span>Baseline tests</span><strong>279 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Release tests</span><strong>292 passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Ruff</span><strong>passed-approved-baseline-comparison</strong><span class="badge warn">passed-approved-baseline-comparison</span></article><article class="evidence-card"><span>Bandit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>Dependency audit</span><strong>passed</strong><span class="badge ok">passed</span></article><article class="evidence-card"><span>CodeQL</span><strong>0 open alerts</strong><span class="badge ok">passed</span></article></div>
-      <div class="boundary" style="margin-top:1rem"><ul><li>292-test hash-locked Python 3.12 release-closeout regression passed</li><li>51 focused release, V2, web, and audit tests passed</li><li>123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed</li><li>Ruff comparison found no new or changed findings; every changed Python file passed</li><li>Bandit found no medium- or high-severity issue</li><li>Dependency audit found no known vulnerability</li><li>Clean sdist, wheel build, locked wheel install, and CLI smoke passed</li><li>Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved</li><li>Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved</li><li>PR CI and CodeQL passed on reviewed head 8f1fed7d88c821f926c332ea691f151c58d73dbd</li><li>post-merge main CI 30523751828 and CodeQL 30523751784 passed</li><li>post-merge open CodeQL alerts: 0</li><li>exactly one independent read-only review completed; all three findings were resolved before merge</li><li>PR #18 CI fix: Bandit B108 closed by user-private signer socket default</li><li>PR #18 CI fix: cryptography 50.0.0 hash-locked for PYSEC-2026-3552</li><li>315-test hash-locked Python 3.12 suite passed locally after the CI fixes</li><li>PR #18 merged to main as 025492456d4e3ca8363d7210abd43d605373b663</li><li>Layer-1 deny matching uses overlaps() so a parent CIDR cannot scan a /32 carve-out</li><li>Packed integer/hex tokens that are not IPv4 deny instead of crashing</li><li>Control-docs CI accepts one-parent squash-merges onto main</li><li>DOM fixture inventory and static-console textContent contract landed</li><li>PR #26 squash-merged to main as 567bffb3cb2253eb7beecbdf318824abdc8981b0</li><li>Playwright execution against live localhost console verified zero script execution, strict CSP, and safe text rendering across all 6 DOM fixtures (issue #24 closed)</li></ul></div>
+      <div class="boundary" style="margin-top:1rem"><ul><li>292-test hash-locked Python 3.12 release-closeout regression passed</li><li>51 focused release, V2, web, and audit tests passed</li><li>123 audit persistence, filesystem, anchor, CLI, and concurrency tests passed</li><li>Ruff comparison found no new or changed findings; every changed Python file passed</li><li>Bandit found no medium- or high-severity issue</li><li>Dependency audit found no known vulnerability</li><li>Clean sdist, wheel build, locked wheel install, and CLI smoke passed</li><li>Phase 1 redirect, request-body, peer, live-mode, and DOM boundaries preserved</li><li>Phase 2A strict replay, locking, durability, diagnostics, and recovery preserved</li><li>PR CI and CodeQL passed on reviewed head 8f1fed7d88c821f926c332ea691f151c58d73dbd</li><li>post-merge main CI 30523751828 and CodeQL 30523751784 passed</li><li>post-merge open CodeQL alerts: 0</li><li>exactly one independent read-only review completed; all three findings were resolved before merge</li><li>PR #18 CI fix: Bandit B108 closed by user-private signer socket default</li><li>PR #18 CI fix: cryptography 50.0.0 hash-locked for PYSEC-2026-3552</li><li>315-test hash-locked Python 3.12 suite passed locally after the CI fixes</li><li>PR #18 merged to main as 025492456d4e3ca8363d7210abd43d605373b663</li><li>Layer-1 deny matching uses overlaps() so a parent CIDR cannot scan a /32 carve-out</li><li>Packed integer/hex tokens that are not IPv4 deny instead of crashing</li><li>Control-docs CI accepts one-parent squash-merges onto main</li><li>DOM fixture inventory and static-console textContent contract landed</li><li>PR #26 squash-merged to main as 567bffb3cb2253eb7beecbdf318824abdc8981b0</li><li>Playwright execution against live localhost console verified zero script execution, strict CSP, and safe text rendering across all 6 DOM fixtures (issue #24 closed)</li><li>Main CI restored: Playwright import optional at collection time; anyio 4.14.2, certifi 2026.10.23, urllib3 2.8.0 hash-locked for PYSEC-2026-4023/4024/4025, PYSEC-2026-4320, PYSEC-2026-4175/4176/4177</li></ul></div>
     </section>
 
     <section id="decisions">
@@ -381,8 +381,8 @@
   </main>
 
   <footer>
-    <div><strong>Source commit:</strong> <code>5f1321c47f1a05f6f09dfafd86daad27d8e06b9c</code></div>
-    <div><strong>Last updated:</strong> <time datetime="2026-11-08T15:30:00Z">2026-11-08T15:30:00Z</time></div>
+    <div><strong>Source commit:</strong> <code>4ce4cb2ad53c501449838996dcee8f9294cc7847</code></div>
+    <div><strong>Last updated:</strong> <time datetime="2026-11-10T03:00:00Z">2026-11-10T03:00:00Z</time></div>
     <div>Argus · authorized defensive assessment only · no deployment performed</div>
   </footer>
 </body>
